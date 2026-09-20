@@ -1,0 +1,13 @@
+{{- /* Site override: this PaperMod version's head.html calls this partial, but the
+     theme no longer ships it, and Hugo 0.166 removed the internal GA template.
+     Render the GA4 tag directly. */ -}}
+{{- with site.Config.Services.GoogleAnalytics.ID }}
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ . }}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', '{{ . }}');
+</script>
+{{- end }}

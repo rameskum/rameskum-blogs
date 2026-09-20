@@ -1,0 +1,6 @@
+{{- /* Site override: this PaperMod version ships an empty comments partial. Render Disqus via Hugo built-in template, same as the old theme did. */ -}}
+{{- if site.Config.Services.Disqus.Shortname }}
+<div class="disqus-comments">
+  {{ template "_internal/disqus.html" . }}
+</div>
+{{- end }}
