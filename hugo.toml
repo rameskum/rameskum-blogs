@@ -18,7 +18,9 @@ theme = "PaperMod"
 enableRobotsTXT = true
 
 [outputs]
-  home = ["HTML", "RSS", "JSON"] # JSON output powers the built-in search page
+  # ROBOTS must be listed explicitly: overriding home outputs drops Hugo's
+  # default ROBOTS output, which silently stops robots.txt from being generated
+  home = ["HTML", "RSS", "JSON", "ROBOTS"] # JSON output powers the built-in search page
 
 # Main menu which appears in the site header.
 [[menu.main]]
@@ -57,7 +59,9 @@ weight = 4
 
 [params]
   env = "production"
-  description = "Welcome to your one-stop destination for all things tech! This website is designed to empower developers of all levels by providing insightful blogs, code snippets, and industry updates. Dive deep into the world of programming languages like Java and Shell Scripting, or stay ahead of the curve with articles exploring the latest advancements in Spring Boot."
+  description = "1Stop: hands-on, code-heavy tutorials on Java, Spring Boot, Docker, Kafka, and AWS — plus interview prep for backend developers."
+  # Default social preview image (og:image / twitter:image) for pages without their own cover
+  images = ["images/og-default.png"]
   author = "Ramesh"
   DateFormat = "2006-01-02" # same date format as the old theme
   defaultTheme = "auto" # auto | dark | light
