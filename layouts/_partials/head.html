@@ -64,9 +64,11 @@
 
 {{- if not site.Params.assets.disableFingerprinting }}
 {{- $stylesheet := $stylesheet | fingerprint }}
-<link crossorigin="anonymous" href="{{ $stylesheet.RelPermalink }}" integrity="{{ $stylesheet.Data.Integrity }}" rel="preload stylesheet" as="style">
+<link crossorigin="anonymous" href="{{ $stylesheet.RelPermalink }}" integrity="{{ $stylesheet.Data.Integrity }}" rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link crossorigin="anonymous" href="{{ $stylesheet.RelPermalink }}" integrity="{{ $stylesheet.Data.Integrity }}" rel="stylesheet"></noscript>
 {{- else }}
-<link crossorigin="anonymous" href="{{ $stylesheet.RelPermalink }}" rel="preload stylesheet" as="style">
+<link crossorigin="anonymous" href="{{ $stylesheet.RelPermalink }}" rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link crossorigin="anonymous" href="{{ $stylesheet.RelPermalink }}" rel="stylesheet"></noscript>
 {{- end }}
 
 {{- /* Search */}}
