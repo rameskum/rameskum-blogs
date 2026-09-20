@@ -1,6 +1,7 @@
 ---
 title: About me
 date: 2024-04-12 14:59:45
+description: "Ramesh is a backend developer writing hands-on, code-heavy tutorials on Java, Spring Boot, Docker, Kafka, and AWS."
 ---
 
 ## About Me
