@@ -1,15 +1,26 @@
 baseURL = "https://blogs.rameskum.com"
-languageCode = "en-us"
+locale = "en-us"
 title = "1Stop"
-theme = "cactus"
-copyright = "You" # cactus will use title if copyright is not set
-disqusShortname = "rameskum" # Used when comments is enabled. Cactus will use site title if not set
-googleAnalytics = "G-MHRW0K00VZ"
+theme = "PaperMod"
 
+# Number of posts shown per paginated list page (was: 5 on the cactus home page)
+# Note: the old top-level `paginate` key is ignored by modern Hugo; use [pagination]
+[pagination]
+  pagerSize = 5
 
-# summaryLength = 2
+# Comments via Disqus (see layouts/_partials/comments.html override)
+# Analytics via Google (see layouts/_partials/google_analytics.html override)
+[services.disqus]
+  shortname = "rameskum"
+[services.googleAnalytics]
+  id = "G-MHRW0K00VZ"
 
-# Main menu which appears below site header.
+enableRobotsTXT = true
+
+[outputs]
+  home = ["HTML", "RSS", "JSON"] # JSON output powers the built-in search page
+
+# Main menu which appears in the site header.
 [[menu.main]]
 name = "Home"
 url = "/"
@@ -17,17 +28,17 @@ weight = 1
 
 [[menu.main]]
 name = "Writings"
-url = "/posts"
+url = "/posts/"
 weight = 2
 
 [[menu.main]]
 name = "Tags"
-url = "/tags"
+url = "/tags/"
 weight = 3
 
 [[menu.main]]
 name = "About"
-url = "/about"
+url = "/about/"
 weight = 4
 
 [markup]
@@ -38,48 +49,48 @@ weight = 4
   [markup.highlight]
     codeFences = true
     guessSyntax = false
-    hl_Lines = ""
     lineNoStart = 1
     lineNos = false
     lineNumbersInTable = false
-    noClasses = true
-    style = "dracula"
+    noClasses = false # use PaperMod's chroma CSS so code blocks follow light/dark theme
     tabWidth = 4
 
 [params]
-  colortheme = "classic" # dark, light, white, or classic
-  rss = true # generate rss feed. default value is false
-  googleAnalyticsAsync = false # use asynchronous tracking. Synchronous tracking by default
-  showAllPostsArchive = false # default
-
-  # Home page settings
+  env = "production"
   description = "Welcome to your one-stop destination for all things tech! This website is designed to empower developers of all levels by providing insightful blogs, code snippets, and industry updates. Dive deep into the world of programming languages like Java and Shell Scripting, or stay ahead of the curve with articles exploring the latest advancements in Spring Boot."
-  mainSection = "posts" # your main section
-  showAllPostsOnHomePage = false # default
-  postsOnHomePage = 5 # this option will be ignored if showAllPostsOnHomePage is set to true
-  tagsOverview = true # show tags overview by default.
-  showProjectsList = true # show projects list by default (if projects data file exists).
-  
-  projectsUrl = "https://github.com/rameskum" # title link for projects list
+  author = "Ramesh"
+  DateFormat = "2006-01-02" # same date format as the old theme
+  defaultTheme = "auto" # auto | dark | light
+  comments = true # show the Disqus comment section on posts
 
-  dateFormat = "2006-01-02"
+  # Sections shown on the home page and in archives
+  mainSections = ["posts"]
 
   # Post page settings
-  show_updated = true # default
-  showReadTime = true # default
+  ShowReadingTime = true
+  ShowShareButtons = true
+  ShowPostNavLinks = true
+  ShowCodeCopyButtons = true
+  ShowToc = true # table of contents on posts
+  TocOpen = false
 
-  [params.comments]
-    enabled = true # default
-    engine = "disqus" # only disqus, utterances, and cactus_comments is supported
+  # "Suggest Changes" link on every post, pointing at this repo
+  [params.editPost]
+    URL = "https://github.com/rameskum/rameskum-blogs/tree/main/content"
+    Text = "Suggest Changes"
+    appendFilePath = true
 
-  # the value of name should be an valid font awesome icon name (brands type)
-  # https://fontawesome.com/icons?d=gallery&s=brands
-  [[params.social]]
+  # Hero block on the home page
+  [params.homeInfoParams]
+    Title = "1Stop"
+    Content = "Welcome to your one-stop destination for all things tech! Insightful blogs, code snippets, and industry updates for developers of all levels — from Java and Spring Boot to Docker, Kafka, and AWS."
+
+  [[params.socialIcons]]
     name = "github"
-    link = "https://github.com/rameskum"
-  [[params.social]]
+    url = "https://github.com/rameskum"
+  [[params.socialIcons]]
     name = "linkedin"
-    link = "https://www.linkedin.com/in/rameskum"
-  [[params.social]]
+    url = "https://www.linkedin.com/in/rameskum"
+  [[params.socialIcons]]
     name = "email"
-    link = "me@rameskum.com"
+    url = "mailto:me@rameskum.com"

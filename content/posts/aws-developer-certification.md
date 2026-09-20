@@ -59,7 +59,7 @@ The whole exam is broken down into domains and sub-domains.
 
 ## Introduction to Elastic Beanstalk
 
-![Elastic Beanstalk Icon](./images/elastic-beanstalk-icon.png)
+![Elastic Beanstalk Icon](./img/elastic-beanstalk-icon.png)
 
 It is a PaaS that allows you to quickly deploy and manage web apps on AWS **without worrying about the underlying infrastructure**.
 
