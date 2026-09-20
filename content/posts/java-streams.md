@@ -2,6 +2,14 @@
 title: 'Java Streams'
 date: 2024-07-29T16:21:42-04:00
 draft: false
+tags:
+  - java
+  - streams
+  - interview
+categories: notes
+keywords:
+  - java
+  - streams
 ---
 
 ## JAVA Streams

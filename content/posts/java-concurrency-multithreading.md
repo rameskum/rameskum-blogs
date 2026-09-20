@@ -2,6 +2,16 @@
 title: 'Java Concurrency Multithreading'
 date: 2024-07-23T20:25:44-04:00
 draft: false
+tags:
+  - java
+  - concurrency
+  - multithreading
+  - interview
+categories: notes
+keywords:
+  - java
+  - concurrency
+  - multithreading
 ---
 
 ## Thread

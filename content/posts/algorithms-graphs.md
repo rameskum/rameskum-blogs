@@ -2,11 +2,12 @@
 title: Algorithms - Graphs
 date: 2024-03-01 09:00:00
 tags:
-  - Algorithms
-category: notes
+  - algorithms
+  - graphs
+categories: notes
 keywords:
-  - Algorithms
-  - Graphs
+  - algorithms
+  - graphs
 ---
 
 ## Undirected Graphs

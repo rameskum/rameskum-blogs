@@ -3,7 +3,6 @@ title: 'Docker'
 date: 2024-07-03T09:50:09-04:00
 draft: false
 tags:
-  - notes
   - docker
 categories: notes
 keywords:
