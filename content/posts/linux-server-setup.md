@@ -1,19 +1,21 @@
 ---
-title: 'New Linux Server? Do These 8 Things Before Anything Else'
+title: 'New Linux Server? Do These 9 Things Before Anything Else'
 date: 2026-09-20T15:05:00-04:00
 draft: false
 ShowToc: true
 description: >-
   The minimum-viable hardening for a fresh Ubuntu or Debian server: system
   updates, a non-root user, SSH key login with password auth disabled, UFW
-  with deny-by-default rules, SSH login logging, and the essential tools
-  (git, fzf, curl, htop) — in the right order so you never lock yourself out.
+  with deny-by-default rules, SSH login logging, essential tools
+  (git, fzf, curl, htop, fail2ban), git config, and Docker — in the right
+  order so you never lock yourself out.
 tags:
   - linux
   - ubuntu
   - debian
   - ssh
   - security
+  - docker
 categories: article
 keywords:
   - ubuntu server setup
@@ -55,7 +57,7 @@ usermod -aG sudo deploy
 `adduser` prompts for a password. Pick a strong one — this password doubles as
 your sudo password until SSH keys are set up (next step).
 
-Verify the sudo group took:
+Verify the user is in the sudo group:
 
 ```bash
 id deploy
@@ -122,7 +124,8 @@ restart when it passes.
 **From a second terminal, test a fresh login before closing your first
 session.** If the second session works, you're safe.
 
-Check who logged in recently using the fingerprints verbose logging records:
+Check recent logins. Verbose logging records a key fingerprint for each
+attempt:
 
 ```bash
 journalctl -u ssh --since today | grep -E "Accepted|Failed"
@@ -208,7 +211,7 @@ git config --global core.editor nano
 git config --global credential.helper "cache --timeout=3600"
 ```
 
-Check it stuck:
+Verify the configuration:
 
 ```bash
 git config --global --list
@@ -227,6 +230,45 @@ Answer `Yes`. It installs security updates daily and emails root on
 failures. Kernel updates still need a reboot — `cat /var/run/reboot-required`
 tells you when.
 
+## 9. Install Docker and add your user to the docker group
+
+Containers are the next thing most servers end up running. Install Docker
+from Docker's official repo — the distro packages lag badly:
+
+```bash
+sudo apt install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/debian/gpg \
+  -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+  https://download.docker.com/linux/debian $(. /etc/os-release && echo $VERSION_CODENAME) stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io \
+  docker-buildx-plugin docker-compose-plugin
+```
+
+On Ubuntu, swap `debian` for `ubuntu` in the two download URLs.
+
+Add your user to the `docker` group so every command doesn't need sudo:
+
+```bash
+sudo usermod -aG docker deploy
+```
+
+Group membership only applies to new logins — log out and back in (or run
+`newgrp docker` in the current shell), then verify:
+
+```bash
+docker run --rm hello-world
+docker compose version
+```
+
+One gotcha to know: Docker publishes container ports directly in iptables,
+bypassing UFW. A `-p 8080:80` container is reachable from the internet even
+with UFW's deny-incoming default. Keep that in mind before exposing anything.
+
 ## The final checklist
 
 Run through this before you call the server done:
@@ -244,8 +286,12 @@ sudo sshd -T | grep -Ei "passwordauthentication|permitrootlogin"
 
 # 4. fail2ban watching ssh
 sudo fail2ban-client status sshd | grep -q "Status.*ok" && echo "fail2ban ok"
+
+# 5. docker works without sudo
+docker run --rm hello-world
 ```
 
 That's it. No password guessing, no open ports you don't know about, a login
-audit trail, and the four tools every server needs. From here it's a clean
-base — add your app's ports to UFW as you deploy, and you're production-ready.
+audit trail, the five essential tools, and Docker ready to go. From here it's
+a clean base — add your app's ports to UFW as you deploy, and you're
+production-ready.
