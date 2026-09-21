@@ -1,5 +1,5 @@
 [build]
-  command = "hugo --gc --minify"
+  command = "hugo --gc --minify && npx --yes pagefind@1 --site public"
   publish = "public"
 
 [build.environment]

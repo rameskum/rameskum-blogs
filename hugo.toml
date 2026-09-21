@@ -20,7 +20,7 @@ enableRobotsTXT = true
 [outputs]
   # ROBOTS must be listed explicitly: overriding home outputs drops Hugo's
   # default ROBOTS output, which silently stops robots.txt from being generated
-  home = ["HTML", "RSS", "JSON", "ROBOTS"] # JSON output powers the built-in search page
+  home = ["HTML", "RSS", "ROBOTS"] # Pagefind builds its own index; no JSON output needed
 
 # Main menu which appears in the site header.
 [[menu.main]]
@@ -42,6 +42,11 @@ weight = 3
 name = "About"
 url = "/about/"
 weight = 4
+
+[[menu.main]]
+name = "Search"
+url = "/search/"
+weight = 5
 
 [markup]
   [markup.tableOfContents]
