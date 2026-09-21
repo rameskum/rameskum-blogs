@@ -15,10 +15,19 @@ theme = "PaperMod"
 
 enableRobotsTXT = true
 
+[outputFormats]
+  # /posts.json — machine-readable feed of all posts, consumed by the
+  # rameskum.com portfolio "Writing" section. Template: layouts/home.postsfeed.json
+  [outputFormats.postsfeed]
+    mediaType = "application/json"
+    baseName = "posts"
+    isPlainText = true
+    notAlternative = true
+
 [outputs]
   # ROBOTS must be listed explicitly: overriding home outputs drops Hugo's
   # default ROBOTS output, which silently stops robots.txt from being generated
-  home = ["HTML", "RSS", "ROBOTS"] # Pagefind builds its own index; no JSON output needed
+  home = ["HTML", "RSS", "ROBOTS", "POSTSFEED"]
 
 # Main menu which appears in the site header.
 [[menu.main]]
