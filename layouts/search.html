@@ -1,0 +1,53 @@
+{{- define "main" }}
+
+<header class="page-header">
+    <h1>{{- (printf "%s&nbsp;" .Title ) | htmlUnescape -}}
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+    </h1>
+    {{- if .Description }}
+    <div class="post-description">
+        {{ .Description }}
+    </div>
+    {{- end }}
+</header>
+
+<div id="pagefind-search" data-pagefind-ignore>
+    <link href="/pagefind/pagefind-component-ui.css" rel="stylesheet">
+    <script src="/pagefind/pagefind-component-ui.js" type="module"></script>
+    <pagefind-input placeholder="Search articles..."></pagefind-input>
+    <pagefind-summary></pagefind-summary>
+    <pagefind-results></pagefind-results>
+</div>
+
+<style>
+    #pagefind-search {
+        --pagefind-ui-scale: 1;
+        --pagefind-ui-primary: var(--primary);
+        --pagefind-ui-text: var(--primary);
+        --pagefind-ui-background: var(--theme);
+        --pagefind-ui-border: var(--border);
+        --pagefind-ui-tag: var(--tertiary);
+        --pagefind-ui-border-width: 1px;
+        --pagefind-ui-border-radius: 8px;
+        --pagefind-ui-font: inherit;
+    }
+    #pagefind-search input {
+        background: var(--entry);
+        color: var(--primary);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        width: 100%;
+        font-size: 1rem;
+    }
+    #pagefind-search mark {
+        background: var(--tertiary);
+        color: var(--primary);
+    }
+</style>
+
+{{- end }}{{/* end main */}}
