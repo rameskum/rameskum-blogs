@@ -1,0 +1,16 @@
+{{- /* JSON feed of all posts, consumed by the rameskum.com portfolio "Writing" section.
+       Published at /posts.json on every build. Fields mirror what the portfolio renders:
+       title, ISO date, plain-text summary, canonical URL, tags. */ -}}
+{{- $posts := where .Site.RegularPages "Section" "posts" -}}
+[
+{{- range $i, $p := $posts }}
+{{- if $i }},{{ end }}
+{
+  "title": {{ $p.Title | jsonify }},
+  "date": {{ $p.Date.Format "2006-01-02T15:04:05-07:00" | jsonify }},
+  "summary": {{ $p.Summary | plainify | truncate 280 | jsonify }},
+  "url": {{ $p.Permalink | jsonify }},
+  "tags": {{ $p.Params.tags | default (slice) | jsonify }}
+}
+{{- end }}
+]
