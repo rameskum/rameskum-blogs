@@ -8,10 +8,8 @@ theme = "PaperMod"
 [pagination]
   pagerSize = 5
 
-# Comments via Disqus (see layouts/_partials/comments.html override)
+# Comments via Giscus (GitHub Discussions) — see layouts/_partials/comments.html override
 # Analytics via Google (see layouts/_partials/google_analytics.html override)
-[services.disqus]
-  shortname = "rameskum"
 [services.googleAnalytics]
   id = "G-MHRW0K00VZ"
 
@@ -82,6 +80,10 @@ weight = 5
   ShowCodeCopyButtons = true
   ShowToc = true # table of contents on posts
   TocOpen = false
+
+  ShowRelatedPosts = true # "Related posts" box after each post (Hugo's built-in related content, weighted by tags/date)
+  # GoatCounter analytics (privacy-friendly, no cookies). Script renders only when this is set.
+  goatcounter = "rameskum"
 
   # "Suggest Changes" link on every post, pointing at this repo
   [params.editPost]

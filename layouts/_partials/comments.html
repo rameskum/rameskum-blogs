@@ -1,6 +1,20 @@
-{{- /* Site override: this PaperMod version ships an empty comments partial. Render Disqus via Hugo built-in template, same as the old theme did. */ -}}
-{{- if site.Config.Services.Disqus.Shortname }}
-<div class="disqus-comments">
-  {{ template "_internal/disqus.html" . }}
+{{- /* Site override: this PaperMod version ships an empty comments partial.
+     Render Giscus (GitHub Discussions-backed) instead of Disqus.
+     Repo/category IDs are stable for rameskum/rameskum-blogs. */ -}}
+<div class="giscus-comments">
+  <script src="https://giscus.app/client.js"
+          data-repo="rameskum/rameskum-blogs"
+          data-repo-id="R_kgDOG4Xe5Q"
+          data-category="General"
+          data-category-id="DIC_kwDOG4Xe5c4DGDw7"
+          data-mapping="pathname"
+          data-strict="0"
+          data-reactions-enabled="1"
+          data-emit-metadata="0"
+          data-input-position="bottom"
+          data-theme="preferred_color_scheme"
+          data-lang="en"
+          crossorigin="anonymous"
+          async>
+  </script>
 </div>
-{{- end }}

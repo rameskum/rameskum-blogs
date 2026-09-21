@@ -1,0 +1,6 @@
+{{- /* GoatCounter analytics (privacy-friendly, no cookies): set
+     params.goatcounter = "yoursitecode" in hugo.toml. Script is omitted
+     entirely until the site code is configured. */ -}}
+{{- with site.Params.goatcounter }}
+<script data-goatcounter="https://{{ . }}.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+{{- end }}

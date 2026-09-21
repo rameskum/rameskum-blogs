@@ -1,0 +1,16 @@
+{{- /* Mermaid diagram support: set `mermaid: true` in a post's front matter and
+     use ```mermaid fenced code blocks. Respects the site's light/dark theme. */ -}}
+{{- if .Param "mermaid" }}
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  const isDark = document.body.classList.contains("dark");
+  mermaid.initialize({ startOnLoad: false, theme: isDark ? "dark" : "default" });
+  document.querySelectorAll("pre code.language-mermaid").forEach((el) => {
+    const div = document.createElement("div");
+    div.className = "mermaid";
+    div.textContent = el.textContent;
+    el.closest("pre").replaceWith(div);
+  });
+  await mermaid.run();
+</script>
+{{- end }}
