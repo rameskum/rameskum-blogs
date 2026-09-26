@@ -72,7 +72,7 @@ If you've never YNAB'd: every dollar of income gets assigned to a category *befo
 
 This is where I won't oversell it. Actual has built-in bank sync via **SimpleFIN** (US banks) and **GoCardless** (EU/UK banks). If you're in the US or Europe, it mostly just works. **If you're in Canada — like me — neither covers Canadian banks well**, and this is the one place YNAB's paid integrations are genuinely better.
 
-The dependable path, everywhere: **CSV import.** Every Canadian bank exports CSV or OFX. In Actual: account → Import → map the columns once → it remembers the mapping. It takes 90 seconds a month, and frankly, the manual review is *why* envelope budgeting works — auto-import is how mystery spending hides.
+The dependable path, everywhere: **CSV import.** Every bank on the planet exports CSV or OFX — the format is universal even where API sync isn't. In Actual: account → Import → map the columns once → it remembers the mapping. It takes 90 seconds a month, and frankly, the manual review is *why* envelope budgeting works — auto-import is how mystery spending hides.
 
 Third-party syncers exist for specific regions (EU folks: `enable-actual` bridges Enable Banking; there's also `bankingsync` in Docker), but start with CSV and only automate if the chore actually bothers you.
 
