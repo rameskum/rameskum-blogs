@@ -1,0 +1,326 @@
+/* RK Skin — PaperMod override to match rameskum.com portfolio (Editorial engineer)
+ * Design: Vera · Spec: rameskum-blogs-papermod-rk-skin.md
+ * Approach: CSS variables + chrome quieting — no theme swap, no layout rewrite
+ */
+
+/* =============================================================================
+   1. Token overrides (light + dark failsafe)
+   ============================================================================= */
+
+:root,
+:root[data-theme="light"],
+:root[data-theme="dark"] {
+  /* Warm paper canvas & cards from portfolio */
+  --theme: #f5f4ec;
+  --entry: #fffcf7;
+  --primary: #111210;
+  --secondary: #5c574e;
+  --tertiary: #e8e4da;
+  --content: #111210;
+  --code-bg: #e8e4da;
+  --code-block-bg: #201e1b;
+  --border: #b9bbb3;
+  --radius: 4px;
+  --rk-accent: #e85a32;
+  color-scheme: light;
+
+  /* Font stacks */
+  --rk-font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --rk-font-mono: "DM Mono", ui-monospace, monospace;
+  --rk-font-serif: "Newsreader", ui-serif, Georgia, serif;
+}
+
+/* List pages: PaperMod uses --code-bg for .list — keep warm paper, not gray */
+.list {
+  background: var(--theme);
+}
+
+/* =============================================================================
+   2. Typography
+   ============================================================================= */
+
+body {
+  font-family: var(--rk-font-sans);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.header .logo a,
+.post-title,
+.first-entry .entry-header h1,
+.entry-header h2,
+.page-header h1 {
+  font-family: var(--rk-font-sans);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+#menu a,
+.post-meta,
+.footer,
+.toc-title,
+.terms-tags a,
+.breadcrumbs {
+  font-family: var(--rk-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+em.rk-accent {
+  font-family: var(--rk-font-serif);
+  font-style: italic;
+  color: var(--rk-accent);
+  font-weight: 400;
+}
+
+/* =============================================================================
+   3. Chrome quieting (nav / footer)
+   ============================================================================= */
+
+.header {
+  background: var(--theme);
+  border-bottom: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.header .logo a {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+#menu a span {
+  font-weight: 500;
+}
+
+#menu a:hover span,
+#menu a.active span {
+  color: var(--rk-accent);
+  border-bottom-color: var(--rk-accent);
+}
+
+.footer {
+  border-top: 1px solid var(--border);
+  background: var(--theme);
+  color: var(--secondary);
+  font-family: var(--rk-font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+}
+
+.footer a {
+  color: var(--secondary);
+}
+
+.footer a:hover {
+  color: var(--rk-accent);
+}
+
+/* Theme toggle should already be gone via disableThemeToggle; belt-and-suspenders */
+#theme-toggle,
+.logo-switches {
+  display: none !important;
+}
+
+/* =============================================================================
+   4. Home
+   ============================================================================= */
+
+.first-entry,
+.home-info {
+  background: var(--entry);
+  border: none;
+  border-radius: var(--radius);
+  box-shadow: none;
+  padding: 2rem;
+}
+
+.home-info h1,
+.first-entry .entry-header h1 {
+  color: var(--primary);
+}
+
+.home-info .entry-content,
+.first-entry .entry-content {
+  color: var(--secondary);
+  line-height: 1.65;
+}
+
+.home-info .social-icons,
+.first-entry .social-icons {
+  margin-top: 1.5rem;
+}
+
+.home-info .social-icons a,
+.first-entry .social-icons a {
+  color: var(--primary);
+}
+
+.home-info .social-icons a:hover,
+.first-entry .social-icons a:hover {
+  color: var(--rk-accent);
+}
+
+/* =============================================================================
+   5. Post list (/, /posts/)
+   ============================================================================= */
+
+.post-entry {
+  background: var(--entry);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: none;
+  padding: 1.5rem;
+}
+
+.post-entry:hover {
+  background: #fffcf7;
+  border-color: #a8aaa2;
+}
+
+.entry-header h2 a {
+  color: var(--primary);
+}
+
+.entry-header h2 a:hover {
+  color: var(--rk-accent);
+}
+
+.entry-content {
+  color: var(--secondary);
+}
+
+/* =============================================================================
+   6. Single post
+   ============================================================================= */
+
+.post-header .post-title {
+  color: var(--primary);
+  line-height: 1.2;
+}
+
+.post-meta {
+  color: var(--secondary);
+}
+
+.post-content {
+  color: var(--content);
+  line-height: 1.7;
+}
+
+.post-content a {
+  color: var(--rk-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.post-content h2,
+.post-content h3 {
+  font-family: var(--rk-font-sans);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  scroll-margin-top: 5rem;
+}
+
+.post-content blockquote {
+  border-left: 2px solid var(--rk-accent);
+  background: transparent;
+  color: var(--secondary);
+  font-style: normal;
+}
+
+/* TOC */
+.toc {
+  background: var(--entry);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.toc details summary,
+.toc-title {
+  font-family: var(--rk-font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  color: var(--secondary);
+}
+
+/* Share / edit / nav links — quieter */
+.share-buttons,
+.edit-post,
+.post-nav,
+.paginav {
+  border-color: var(--border);
+}
+
+/* Pagination — ghost outline buttons */
+.pagination,
+.paginav {
+  background: transparent;
+}
+
+.pagination a,
+.pagination .current,
+.paginav a,
+.paginav .page-item {
+  background: transparent !important;
+  border: 1px solid var(--border) !important;
+  color: var(--primary) !important;
+  border-radius: var(--radius);
+  font-family: var(--rk-font-sans);
+  font-weight: 500;
+}
+
+.pagination a:hover,
+.paginav a:hover {
+  background: transparent !important;
+  border-color: var(--rk-accent) !important;
+  color: var(--rk-accent) !important;
+}
+
+.pagination .current {
+  border-color: var(--primary) !important;
+}
+
+/* =============================================================================
+   7. Code
+   ============================================================================= */
+
+.post-content code:not(.code-block code) {
+  background: var(--code-bg);
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.post-content pre {
+  background: var(--code-block-bg) !important;
+  border: 1px solid #2a2824;
+  border-radius: var(--radius);
+}
+
+.copy-code {
+  border-color: var(--border);
+}
+
+/* =============================================================================
+   8. Search (Pagefind / PaperMod search page)
+   ============================================================================= */
+
+#searchbox input,
+.search-input {
+  background: var(--entry);
+  border: 1px solid var(--border);
+  color: var(--primary);
+  border-radius: var(--radius);
+  font-family: var(--rk-font-sans);
+}
+
+/* Pagefind UI soft-override */
+.pagefind-ui {
+  --pagefind-ui-primary: var(--rk-accent);
+  --pagefind-ui-text: var(--primary);
+  --pagefind-ui-background: var(--entry);
+  --pagefind-ui-border: var(--border);
+  --pagefind-ui-font: var(--rk-font-sans);
+}

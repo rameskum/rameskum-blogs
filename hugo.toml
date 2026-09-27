@@ -76,7 +76,8 @@ weight = 5
   images = ["images/og-default.png"]
   author = "Ramesh"
   DateFormat = "2006-01-02" # same date format as the old theme
-  defaultTheme = "auto" # auto | dark | light
+  defaultTheme = "light" # force light theme to match rameskum.com portfolio
+  disableThemeToggle = true # no visitor dark mode
   comments = true # show the Disqus comment section on posts
 
   # Sections shown on the home page and in archives
