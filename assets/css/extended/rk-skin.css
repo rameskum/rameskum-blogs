@@ -130,9 +130,10 @@ em.rk-accent {
 .first-entry,
 .home-info {
   background: var(--entry);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius);
   box-shadow: none;
+  padding: 2rem;
 }
 
 .home-info h1,
@@ -146,6 +147,21 @@ em.rk-accent {
   line-height: 1.65;
 }
 
+.home-info .social-icons,
+.first-entry .social-icons {
+  margin-top: 1.5rem;
+}
+
+.home-info .social-icons a,
+.first-entry .social-icons a {
+  color: var(--primary);
+}
+
+.home-info .social-icons a:hover,
+.first-entry .social-icons a:hover {
+  color: var(--rk-accent);
+}
+
 /* =============================================================================
    5. Post list (/, /posts/)
    ============================================================================= */
@@ -155,6 +171,7 @@ em.rk-accent {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: none;
+  padding: 1.5rem;
 }
 
 .post-entry:hover {
