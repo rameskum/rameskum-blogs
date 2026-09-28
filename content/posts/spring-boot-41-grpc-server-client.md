@@ -39,11 +39,11 @@ Two dependencies, no third-party anything, no extra BOM:
 </dependency>
 ```
 
-On start.spring.io they're just "gRPC Server" and "gRPC Client". The Boot BOM pins `spring-grpc-core:1.1.0` and `grpc-java:1.80.0` — you never declare versions yourself. Test variants exist too: `spring-boot-starter-grpc-server-test` and `spring-boot-starter-grpc-client-test` (more on those below).
+On start.spring.io they're just "gRPC Server" and "gRPC Client". The Boot BOM pins `spring-grpc-core:1.1.0` and `grpc-java:1.80.0` — you never declare versions yourself. Test variants exist too: `spring-boot-starter-grpc-server-test` and `spring-boot-starter-grpc-client-test` (more on those in Testing below).
 
-## The contract first
+## Contract-first: the .proto
 
-Proto files go in `src/main/proto`. Generate the Java with the protobuf plugin:
+Proto files go in `src/main/proto`. Put your `.proto` files there, then use the protobuf Maven plugin to generate the Java classes:
 
 ```proto
 // src/main/proto/greeter.proto
@@ -124,7 +124,7 @@ public class GreeterService extends GreeterGrpc.GreeterImplBase {
 spring.grpc.server.port=9090
 ```
 
-Boot starts a Netty gRPC server on 9090 (configurable under `spring.grpc.server.*`: TLS via SSL bundles, keep-alive, message size limits, graceful shutdown). Reflection and health services are registered automatically — point `grpcurl` at it and it just works:
+Boot starts a Netty gRPC server on 9090. Everything is configurable under `spring.grpc.server.*`: TLS via SSL bundles, keep-alive, message size limits, and graceful shutdown. Reflection and health services are registered automatically — point `grpcurl` at it and it just works:
 
 ```bash
 grpcurl -plaintext localhost:9090 list
@@ -191,7 +191,7 @@ The channel name (`greeter`) maps to `spring.grpc.client.channel.greeter.*` — 
 
 ## Testing: in-process, no ports
 
-This is the nicest surprise. `@AutoConfigureTestGrpcTransport` swaps the Netty server for gRPC's in-process transport: your test still flows through interceptors, `@GrpcAdvice` handlers, and marshalling — just without TCP and without port conflicts.
+This is the nicest surprise. `@AutoConfigureTestGrpcTransport` swaps the Netty server for gRPC's in-process transport: your test still flows through interceptors, `@GrpcAdvice` handlers, and marshalling — just without TCP and without port conflicts. The annotation comes from the test starters — drop `spring-boot-starter-grpc-server-test` (or its client sibling) into your test scope and it's on the classpath.
 
 ```java
 @SpringBootTest
