@@ -35,7 +35,7 @@ The textbook answer is two-phase commit: a coordinator asks every participant to
 
 The industry's answer: break the distributed transaction into a **sequence of local transactions**, one per service. Each step commits independently. If a later step fails, you run **compensating transactions** that undo the business effects of the earlier steps — not a physical rollback, a *semantic* undo. Refund the payment. Release the reservation. Cancel the order. The system converges on a consistent business state. This is the **saga pattern**, and the consistency it gives you is eventual, not ACID.
 
-That distinction matters, so let's be precise: a saga does not give you atomicity. There will be moments — while the saga is running, while it's compensating — when the system's state is visibly inconsistent. The guarantee is weaker and more honest: the saga is designed to always terminate in a business-consistent state, success or compensated failure. But a compensation that keeps failing can leave it stuck indefinitely — which is why "compensation failed" has to be the loudest alert in the system, not a log line.
+That distinction matters, so let's be precise: a saga does not give you atomicity. There will be moments — while the saga is running, while it's compensating — when the system's state is visibly inconsistent. The guarantee is weaker and more honest: the saga drives toward a business-consistent end state — success or compensated failure — but it can't promise to get there on its own. A compensation that keeps failing leaves the saga stuck indefinitely, which is why "compensation failed" has to be the loudest alert in the system, not a log line.
 
 ## The flow we'll build
 
@@ -80,6 +80,19 @@ public void onOrderCreated(OrderCreated e) {
 }
 ```
 
+`PaymentFailed` has to land somewhere — the OrderService listens for it and cancels the order. Nothing else happened yet, so this is a pure local transaction:
+
+```java
+// OrderService — compensates when payment fails
+@KafkaListener(topics = "payments", groupId = "order-compensation")
+@Transactional
+public void onPaymentFailed(PaymentFailed e) {
+    Order order = orderRepository.findById(e.orderId()).orElseThrow();
+    order.cancel();
+    outbox.save("orders", new OrderCancelled(e.orderId(), e.reason()));
+}
+```
+
 ```java
 // InventoryService — reacts to PaymentCharged
 @KafkaListener(topics = "payments", groupId = "inventory")
@@ -103,6 +116,19 @@ And the compensation side — each service also listens for failure events and u
 public void onInventoryFailed(InventoryFailed e) {
     paymentGateway.refund(e.orderId());   // must be idempotent — this event can redeliver
     outbox.save("payments", new PaymentRefunded(e.orderId()));
+}
+```
+
+The refund completes the payment compensation, but the order itself is still open. The OrderService closes the loop at the end of the chain:
+
+```java
+// OrderService — final compensation when inventory failed
+@KafkaListener(topics = "payments", groupId = "order-compensation")
+@Transactional
+public void onPaymentRefunded(PaymentRefunded e) {
+    Order order = orderRepository.findById(e.orderId()).orElseThrow();
+    order.cancel();
+    outbox.save("orders", new OrderCancelled(e.orderId(), "inventory unavailable"));
 }
 ```
 
@@ -174,10 +200,10 @@ Second, notice what's missing from the orchestrator: business logic. It doesn't 
 
 Rules of thumb that survive contact with production:
 
-- **Choreography** for short, linear flows (2–3 steps) where teams own their services end-to-end and nobody will ever ask for an audit trail of the transaction.
+- **Choreography** for short, linear flows (2–3 steps) where teams own their services end-to-end and no regulator or auditor will ever ask for a transaction trail.
 - **Orchestration** for longer flows, complex compensation (conditional branches, partial compensation), or anything regulated — the central state table is the audit trail.
 
-Most teams that start with choreography and grow past four services end up building an orchestrator anyway, except now it's called "the tracking service" and it was built at 3 AM. Skip the intermediate step.
+It's a familiar story: choreography grows past a few services, debugging gets painful, and someone builds a "tracking service" to reconstruct saga state from scattered events — an orchestrator in everything but name, usually built at 3 AM. If you recognize where yours is heading, skip the intermediate step.
 
 ## The hard parts (where interviews live)
 
@@ -207,6 +233,6 @@ The happy path is a tutorial. The failure handling is the job.
 
 If they ask choreography vs orchestration: *"Choreography is events with no boss — fine for simple linear flows, painful to debug. Orchestration is a coordinator issuing commands with a durable state table — central visibility, explicit compensation, the default for anything an auditor will ask about."*
 
-If they ask why not 2PC: *"It needs every participant to promise to commit before anyone does — one slow participant stalls everyone, one crashed participant blocks recovery, and running XA across microservices is rare in practice because of that operational cost. Sagas are the industry's default answer."*
+If they ask why not 2PC: *"It needs every participant to promise to commit before anyone does — one slow participant stalls everyone, one crashed participant blocks recovery, and running XA across microservices is rare in practice because of that operational cost. That's why teams reach for sagas instead."*
 
 And if they ask what the outbox has to do with it: *"The saga coordinates the business transaction; the outbox guarantees the saga's commands and events are durably recorded and reliably published — not that they're processed end to end, that's what idempotent consumers are for. Outbox for durable publication, idempotency keys for safe retries, saga for cross-service consistency — that's the full stack."*
