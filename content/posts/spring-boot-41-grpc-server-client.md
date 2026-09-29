@@ -66,7 +66,7 @@ message HelloReply {
 }
 ```
 
-The Spring Boot gRPC starters provide the runtime pieces. The protobuf Maven plugin remains responsible for turning the `.proto` contract into generated Java classes during the build:
+The Spring Boot BOM manages the runtime gRPC dependencies. The protobuf Maven plugin still needs an explicit protoc and protoc-gen-grpc-java version for build-time code generation:
 
 ```xml
 <!-- the standard protobuf-maven-plugin setup -->
@@ -198,7 +198,7 @@ public class GreetingClient {
 }
 ```
 
-The channel mapping is explicit now: `target = "greeter"` names the channel, and the channel's settings live under that name:
+The channel is named `greeter`, and its settings live under `spring.grpc.client.channel.greeter.*`:
 
 ```
 @ImportGrpcClients(target = "greeter")
