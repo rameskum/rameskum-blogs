@@ -31,11 +31,11 @@ This is the problem the transactional outbox does *not* solve. The outbox guaran
 
 ## Why you can't just "make it atomic"
 
-The textbook answer is two-phase commit: a coordinator asks every participant to prepare, waits for unanimous yes, then tells everyone to commit. In a classroom, it works. In production microservices, it means holding locks on inventory rows across a network call while the payment service does its thing. One slow participant stalls everyone, and one crashed participant blocks recovery. Distributed transactions across services trade availability for a consistency guarantee that most business flows don't actually need — the order doesn't have to be *atomically* consistent, it has to end up *correctly* consistent.
+The textbook answer is two-phase commit: a coordinator asks every participant to prepare, waits for unanimous yes, then tells everyone to commit. In a classroom, it works. In production microservices, it requires every participant to promise to commit before anyone actually does — holding that promise across network round-trips while the coordinator collects unanimous agreement. One slow participant stalls everyone, and one crashed participant blocks recovery. Distributed transactions across services trade availability for a consistency guarantee that most business flows don't actually need — the order doesn't have to be *atomically* consistent, it has to end up *correctly* consistent.
 
 The industry's answer: break the distributed transaction into a **sequence of local transactions**, one per service. Each step commits independently. If a later step fails, you run **compensating transactions** that undo the business effects of the earlier steps — not a physical rollback, a *semantic* undo. Refund the payment. Release the reservation. Cancel the order. The system converges on a consistent business state. This is the **saga pattern**, and the consistency it gives you is eventual, not ACID.
 
-That distinction matters, so let's be precise: a saga does not give you atomicity. There will be moments — while the saga is running, while it's compensating — when the system's state is visibly inconsistent. The guarantee is weaker and more honest: the saga always terminates in a business-consistent state, success or compensated failure.
+That distinction matters, so let's be precise: a saga does not give you atomicity. There will be moments — while the saga is running, while it's compensating — when the system's state is visibly inconsistent. The guarantee is weaker and more honest: the saga is designed to always terminate in a business-consistent state, success or compensated failure. But a compensation that keeps failing can leave it stuck indefinitely — which is why "compensation failed" has to be the loudest alert in the system, not a log line.
 
 ## The flow we'll build
 
@@ -59,10 +59,12 @@ In choreography, there is no coordinator. Each service reacts to events, does it
 @Transactional
 public Order placeOrder(PlaceOrder cmd) {
     Order order = orderRepository.save(new Order(cmd));
-    kafka.send("orders", new OrderCreated(order.getId(), cmd.items(), cmd.amount()));
+    outbox.save("orders", new OrderCreated(order.getId(), cmd.items(), cmd.amount()));
     return order;
 }
 ```
+
+Note the `outbox.save`, not `kafka.send` — publishing straight from the transaction is the dual-write problem from the [outbox post](https://blogs.rameskum.com/posts/transactional-outbox-spring-boot-kafka/). Every event in this article goes to the outbox table in the same local transaction; a relay publishes them to Kafka. The saga coordinates the business transaction, the outbox makes its messaging durable.
 
 ```java
 // PaymentService — reacts to OrderCreated
@@ -71,9 +73,9 @@ public Order placeOrder(PlaceOrder cmd) {
 public void onOrderCreated(OrderCreated e) {
     try {
         paymentGateway.charge(e.orderId(), e.amount());   // idempotency key = orderId
-        kafka.send("payments", new PaymentCharged(e.orderId(), e.items()));
+        outbox.save("payments", new PaymentCharged(e.orderId(), e.items()));
     } catch (PaymentDeclined ex) {
-        kafka.send("payments", new PaymentFailed(e.orderId(), ex.getReason()));
+        outbox.save("payments", new PaymentFailed(e.orderId(), ex.getReason()));
     }
 }
 ```
@@ -85,9 +87,9 @@ public void onOrderCreated(OrderCreated e) {
 public void onPaymentCharged(PaymentCharged e) {
     try {
         inventory.reserve(e.orderId(), e.items());
-        kafka.send("inventory", new InventoryReserved(e.orderId()));
+        outbox.save("inventory", new InventoryReserved(e.orderId()));
     } catch (OutOfStock ex) {
-        kafka.send("inventory", new InventoryFailed(e.orderId()));
+        outbox.save("inventory", new InventoryFailed(e.orderId()));
     }
 }
 ```
@@ -100,7 +102,7 @@ And the compensation side — each service also listens for failure events and u
 @Transactional
 public void onInventoryFailed(InventoryFailed e) {
     paymentGateway.refund(e.orderId());   // must be idempotent — this event can redeliver
-    kafka.send("payments", new PaymentRefunded(e.orderId()));
+    outbox.save("payments", new PaymentRefunded(e.orderId()));
 }
 ```
 
@@ -155,7 +157,7 @@ public class OrderSagaOrchestrator {
 }
 ```
 
-Two things to notice. First, the `saga_state` table: the orchestrator persists its progress *before* acting, so a crash mid-saga is recoverable — on restart it reads the state and resumes or compensates from the last known step. An orchestrator without durable state is just a script with a fancy name.
+Two things to notice. First, the `saga_state` table: the orchestrator records its progress durably, so a crash mid-saga is usually recoverable — on restart it reads the state and resumes or compensates from the last known step. But durable state alone doesn't close every window: if the process dies after the payment succeeds and before `stepDone()` is recorded, recovery will retry a step that already executed — which is exactly why every step must be idempotent. An orchestrator without durable state is just a script with a fancy name; an orchestrator without idempotent steps is a duplicate-charge generator.
 
 Second, notice what's missing from the orchestrator: business logic. It doesn't know how to charge a card or reserve stock. It knows the *sequence* and the *compensation mapping*. Keep it that way — the moment the orchestrator starts making business decisions, it becomes the distributed monolith everyone feared.
 
@@ -187,7 +189,7 @@ The happy path is a tutorial. The failure handling is the job.
 
 **Retry with backoff, and know when to stop.** Transient failures (network blip, brief downstream outage) deserve retries with exponential backoff. Permanent failures (payment declined, out of stock) deserve immediate compensation, not ten retries of a card that will never clear. Your step implementations need to distinguish the two — catch the domain exception separately from the infrastructure exception.
 
-**The saga needs reliable messaging — which is where the outbox comes back in.** Whether the orchestrator sends commands or services publish events, a lost command means a stuck saga. If your saga steps communicate over Kafka, the [transactional outbox](https://blogs.rameskum.com/posts/transactional-outbox-spring-boot-kafka/) is what guarantees the command or event actually leaves the service. The patterns compose: outbox for durable publication, idempotency keys for safe retries, saga for the cross-service business transaction.
+**The saga needs reliable messaging — which is where the outbox comes back in.** Whether the orchestrator sends commands or services publish events, a lost command means a stuck saga. If your saga steps communicate over Kafka, the [transactional outbox](https://blogs.rameskum.com/posts/transactional-outbox-spring-boot-kafka/) is what guarantees the command or event is durably recorded and reliably published with retries. Note the boundary: the outbox guarantees publication, not end-to-end processing — the downstream service still has to receive and idempotently handle the message. The patterns compose: outbox for durable publication, idempotency keys for safe retries, saga for the cross-service business transaction.
 
 **Observability is a design requirement, not a nice-to-have.** Propagate the saga ID as a correlation ID through every command, event, and log line. Your 3 AM self should be able to run one query — against the orchestrator's state table or your log aggregator — and see the saga's full history: steps completed, step failed, compensations run.
 
@@ -205,6 +207,6 @@ The happy path is a tutorial. The failure handling is the job.
 
 If they ask choreography vs orchestration: *"Choreography is events with no boss — fine for simple linear flows, painful to debug. Orchestration is a coordinator issuing commands with a durable state table — central visibility, explicit compensation, the default for anything an auditor will ask about."*
 
-If they ask why not 2PC: *"It holds locks across the network, one slow participant stalls everyone, and nobody operates XA between microservices. Sagas are the industry's answer."*
+If they ask why not 2PC: *"It needs every participant to promise to commit before anyone does — one slow participant stalls everyone, one crashed participant blocks recovery, and running XA across microservices is rare in practice because of that operational cost. Sagas are the industry's default answer."*
 
-And if they ask what the outbox has to do with it: *"The saga coordinates the business transaction; the outbox guarantees the saga's commands and events actually get delivered. Outbox for durable publication, idempotency keys for safe retries, saga for cross-service consistency — that's the full stack."*
+And if they ask what the outbox has to do with it: *"The saga coordinates the business transaction; the outbox guarantees the saga's commands and events are durably recorded and reliably published — not that they're processed end to end, that's what idempotent consumers are for. Outbox for durable publication, idempotency keys for safe retries, saga for cross-service consistency — that's the full stack."*
