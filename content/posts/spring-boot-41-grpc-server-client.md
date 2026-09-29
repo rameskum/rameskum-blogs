@@ -4,7 +4,7 @@ date: 2026-09-28T08:33:48-0400
 draft: false
 ShowToc: true
 description: >-
-  Spring Boot 4.1 moved gRPC auto-configuration into Boot itself: real
+  Spring Boot 4.1 brings first-class gRPC support to Boot itself: official
   starters on start.spring.io, @GrpcService servers, injected type-safe
   clients, and in-process test transport. From .proto to a working
   server-plus-client project, with the test and exception-handling pieces.
@@ -22,7 +22,7 @@ keywords:
   - grpc server client spring
 ---
 
-Adding gRPC to Spring Boot used to mean picking a third-party starter (LogNet, yidongnan), pinning `grpc-java` versions by hand, and writing your own server lifecycle glue. Spring gRPC 1.0 made it official but kept the auto-configuration outside Boot. **Spring Boot 4.1 finished the job**: the auto-configuration moved into Boot itself, the starters are on start.spring.io, and the BOM manages every `io.grpc` version. If you can build a REST endpoint in Spring, you already know how to build a gRPC service.
+Adding gRPC to Spring Boot traditionally meant choosing a third-party starter such as LogNet or yidongnan, managing gRPC versions, and dealing with server configuration yourself. Spring gRPC 1.0 made it official but kept the auto-configuration outside Boot. **Spring Boot 4.1 finished the job**: the auto-configuration moved into Boot itself, the starters are on start.spring.io, and the BOM manages the versions of the gRPC dependencies it provides. If you're comfortable building REST endpoints with Spring, Spring Boot 4.1 makes the gRPC programming model feel surprisingly familiar.
 
 ## The starters
 
@@ -39,7 +39,7 @@ Two dependencies, no third-party anything, no extra BOM:
 </dependency>
 ```
 
-On start.spring.io they're just "gRPC Server" and "gRPC Client". The Boot BOM pins `spring-grpc-core:1.1.0` and `grpc-java:1.80.0` — you never declare versions yourself. Test variants exist too: `spring-boot-starter-grpc-server-test` and `spring-boot-starter-grpc-client-test` (more on those in Testing below).
+On start.spring.io they're just "gRPC Server" and "gRPC Client". The Spring Boot BOM manages the compatible Spring gRPC and gRPC Java versions, so you don't need to declare them yourself.
 
 ## Contract-first: the .proto
 
@@ -57,9 +57,16 @@ service Greeter {
   rpc StreamHellos (HelloRequest) returns (stream HelloReply);
 }
 
-message HelloRequest { string name = 1; }
-message HelloReply { string message = 1; }
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloReply {
+  string message = 1;
+}
 ```
+
+The Spring Boot gRPC starters provide the runtime pieces. The protobuf Maven plugin remains responsible for turning the `.proto` contract into generated Java classes during the build:
 
 ```xml
 <!-- the standard protobuf-maven-plugin setup -->
@@ -91,7 +98,7 @@ message HelloReply { string message = 1; }
 
 ## The server: one annotation
 
-Any bean implementing `io.grpc.BindableService` is auto-exposed. In practice: extend the generated `ImplBase`, slap on `@GrpcService`, done. No server builder, no lifecycle code.
+Any Spring bean implementing `io.grpc.BindableService` can be exposed as a gRPC service. In practice, extend the generated `ImplBase` and annotate it with `@GrpcService`. No server builder, no lifecycle code.
 
 ```java
 @GrpcService
@@ -108,7 +115,7 @@ public class GreeterService extends GreeterGrpc.GreeterImplBase {
 
     @Override
     public void streamHellos(HelloRequest request, StreamObserver<HelloReply> responseObserver) {
-        // server-side streaming works exactly like the grpc-java API you already know
+        // standard gRPC Java server-streaming: send multiple responses through the StreamObserver
         for (int i = 1; i <= 3; i++) {
             responseObserver.onNext(HelloReply.newBuilder()
                     .setMessage("Hello #%d, %s".formatted(i, request.getName()))
@@ -124,7 +131,7 @@ public class GreeterService extends GreeterGrpc.GreeterImplBase {
 spring.grpc.server.port=9090
 ```
 
-Boot starts a Netty gRPC server on 9090. Everything is configurable under `spring.grpc.server.*`: TLS via SSL bundles, keep-alive, message size limits, and graceful shutdown. Reflection and health services are registered automatically — point `grpcurl` at it and it just works:
+Boot starts a Netty gRPC server on 9090. Everything is configurable under `spring.grpc.server.*`: TLS via SSL bundles, keep-alive, message size limits, and graceful shutdown. When `grpc-services` is on the classpath, Spring Boot can automatically configure gRPC reflection and health support — so `grpcurl` can discover the service without additional server configuration:
 
 ```bash
 grpcurl -plaintext localhost:9090 list
@@ -133,9 +140,11 @@ grpcurl -plaintext localhost:9090 list
 # grpc.reflection.v1.ServerReflection
 ```
 
+`-plaintext` is right for this sample because the server doesn't use TLS — don't copy that flag into production. Each of these lines is a service you can then call with `grpcurl`: `grpc.health.v1.Health` for health checks, `grpc.reflection.v1.ServerReflection` for discovery.
+
 ### Exception handling and interceptors
 
-The programming model will feel familiar: `@GrpcAdvice` is the gRPC analog of `@RestControllerAdvice`, mapping exceptions to gRPC statuses, and `@GlobalServerInterceptor` beans apply to every service.
+The programming model will feel familiar: `@GrpcAdvice` is the gRPC equivalent of the familiar `@RestControllerAdvice` pattern, mapping exceptions to gRPC statuses, and `@GlobalServerInterceptor` beans apply to every service.
 
 ```java
 @GrpcAdvice
@@ -159,17 +168,19 @@ public class LoggingInterceptor implements ServerInterceptor {
 }
 ```
 
+Multiple global interceptors can be ordered with Spring's usual `@Order` mechanism.
+
 ## The client: inject a stub like a RestClient
 
 Declare the channel target in properties, import the clients, inject the stub. No `ManagedChannelBuilder` anywhere in your code.
 
 ```properties
-spring.grpc.client.channel.greeter.address=localhost:9090
+spring.grpc.client.channel.greeter.target=localhost:9090
 ```
 
 ```java
 @SpringBootApplication
-@ImportGrpcClients("com.example.demo.proto")  // or target a specific stub class
+@ImportGrpcClients(target = "greeter", types = GreeterGrpc.GreeterBlockingStub.class)
 public class DemoApplication { ... }
 
 @Service
@@ -187,11 +198,21 @@ public class GreetingClient {
 }
 ```
 
-The channel name (`greeter`) maps to `spring.grpc.client.channel.greeter.*` — address, TLS, keep-alive, retries all live there, configured like a data source.
+The channel mapping is explicit now: `target = "greeter"` names the channel, and the channel's settings live under that name:
+
+```
+@ImportGrpcClients(target = "greeter")
+                    ↓
+spring.grpc.client.channel.greeter.target
+                    ↓
+localhost:9090
+```
+
+TLS, keep-alive, message-size limits, and other channel-specific settings can be configured under `spring.grpc.client.channel.greeter.*` too — configured like a data source. Retry-related channel configuration can also be supplied there where supported.
 
 ## Testing: in-process, no ports
 
-This is the nicest surprise. `@AutoConfigureTestGrpcTransport` swaps the Netty server for gRPC's in-process transport: your test still flows through interceptors, `@GrpcAdvice` handlers, and marshalling — just without TCP and without port conflicts. The annotation comes from the test starters — drop `spring-boot-starter-grpc-server-test` (or its client sibling) into your test scope and it's on the classpath.
+This is the nicest surprise. `@AutoConfigureTestGrpcTransport` configures an in-process gRPC test transport, so the test doesn't need to open a TCP port. The test still exercises the Spring gRPC application layer, including service invocation and exception handling, without requiring a network listener. It doesn't replace tests that need to exercise the real network transport, TLS, HTTP/2 behavior, or deployment configuration. The annotation ships in the gRPC test starters — add `spring-boot-starter-grpc-server-test` (or its client sibling) to your test scope and it's on the classpath.
 
 ```java
 @SpringBootTest
@@ -202,7 +223,7 @@ class GreeterServiceTest {
     GreeterGrpc.GreeterBlockingStub greeter;
 
     @Test
-    void saysHello() {
+    void returnsGreeting() {
         HelloReply reply = greeter.sayHello(HelloRequest.newBuilder().setName("Ramesh").build());
         assertThat(reply.getMessage()).isEqualTo("Hello, Ramesh");
     }
@@ -218,11 +239,11 @@ class GreeterServiceTest {
 }
 ```
 
-Fast, deterministic, no `@DynamicPropertySource` port juggling. This alone is worth the upgrade.
+Fast, deterministic, and no `@DynamicPropertySource` port juggling. For me, this is one of the nicest improvements in the new gRPC support.
 
 ## One port for both worlds
 
-Running gRPC next to an existing REST API? Boot 4.1 supports a Servlet-embedded transport mode so gRPC and Spring MVC share one port over HTTP/2, instead of running the gRPC server on a separate Netty port. Useful for the migration period where half your clients still speak REST.
+Running gRPC next to an existing REST API? Boot 4.1 supports a Servlet-embedded transport mode so gRPC and Spring MVC share one port over HTTP/2, instead of running the gRPC server on a separate Netty port. Useful for the migration period where half your clients still speak REST. The default standalone setup still uses a native gRPC server such as Netty — the Servlet transport is the opt-in for sharing the application's HTTP/2 servlet server.
 
 ## When gRPC, when REST
 
@@ -230,14 +251,14 @@ Honest framing, since the hype oversells it:
 
 | | gRPC | REST |
 |---|---|---|
-| Contract | Strong (proto, codegen) | Loose (OpenAPI if you're disciplined) |
-| Payload | Protobuf binary — small, fast | JSON — human-readable, debuggable |
-| Streaming | First-class (bidi, server, client) | Bolted on (SSE, websockets) |
-| Browser clients | Needs grpc-web proxy | Native |
+| Contract | Explicit schema (.proto, codegen) | HTTP resources + optional OpenAPI contract |
+| Payload | Binary Protobuf — typically compact and efficient | Text-based JSON — easy to inspect manually |
+| Streaming | Built into the RPC model | Usually handled with SSE, WebSockets, or other HTTP mechanisms |
+| Browser clients | Usually requires gRPC-Web or a gateway | Native HTTP/JSON APIs |
 | Tooling | grpcurl, reflection | curl, every tool ever |
 
-gRPC wins for service-to-service calls with a stable contract and for streaming. REST still wins for public APIs, browser clients, and anything where "curl it and read the response" matters. Boot 4.1 doesn't pick a side — it just makes the gRPC side as easy as the REST side always was.
+gRPC is often a strong fit for service-to-service communication, strongly typed contracts, and streaming RPCs. REST remains a natural fit for public HTTP APIs, browser-facing applications, and APIs where human-readable requests and responses are important. Boot 4.1 doesn't force either model — it just makes the gRPC side as easy as the REST side always was.
 
 ## The interview one-liner
 
-*"Spring Boot 4.1 moved gRPC auto-configuration into Boot itself: `@GrpcService` exposes any `BindableService`, `@ImportGrpcClients` injects type-safe stubs configured under `spring.grpc.client.channel.*`, and `@AutoConfigureTestGrpcTransport` gives you in-process tests. No third-party starter, no manual channel code."*
+*"Spring Boot 4.1 moved gRPC auto-configuration into Boot itself: `@GrpcService` exposes any `BindableService`, `@ImportGrpcClients` registers generated type-safe stubs as Spring beans configured under `spring.grpc.client.channel.*`, and `@AutoConfigureTestGrpcTransport` gives you in-process tests. No third-party gRPC starter, no manual channel code."*
