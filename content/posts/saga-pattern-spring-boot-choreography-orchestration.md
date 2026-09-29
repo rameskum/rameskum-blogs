@@ -25,13 +25,13 @@ keywords:
   - distributed transactions saga
 ---
 
-It's 3 AM again. A customer placed an order, payment went through, and inventory reservation failed — the warehouse is out of stock. The customer has been charged for something that will never ship. There is no `@Transactional` that spans your order service, your payment service, and your inventory service. Each one committed its own local transaction, and two of them are now wrong.
+It's 3 AM again. A customer placed an order, payment went through, and inventory reservation failed — the warehouse is out of stock. The customer has been charged for something that will never ship. The order row exists and the customer was charged, but nothing will ship — and no single transaction can unwind it, because there is no `@Transactional` that spans your order service, your payment service, and your inventory service. Each one already committed its own local transaction.
 
 This is the problem the transactional outbox does *not* solve. The outbox guarantees your event gets out of the service. It says nothing about what happens when the business transaction spans three databases owned by three services. That's the saga's job.
 
 ## Why you can't just "make it atomic"
 
-The textbook answer is two-phase commit: a coordinator asks every participant to prepare, waits for unanimous yes, then tells everyone to commit. In a classroom, it works. In production microservices, it means holding locks on inventory rows across a network call while the payment service does its thing. One slow participant stalls everyone. One crashed participant blocks recovery. Distributed transactions across services trade availability for a consistency guarantee that most business flows don't actually need — the order doesn't have to be *atomically* consistent, it has to end up *correctly* consistent.
+The textbook answer is two-phase commit: a coordinator asks every participant to prepare, waits for unanimous yes, then tells everyone to commit. In a classroom, it works. In production microservices, it means holding locks on inventory rows across a network call while the payment service does its thing. One slow participant stalls everyone, and one crashed participant blocks recovery. Distributed transactions across services trade availability for a consistency guarantee that most business flows don't actually need — the order doesn't have to be *atomically* consistent, it has to end up *correctly* consistent.
 
 The industry's answer: break the distributed transaction into a **sequence of local transactions**, one per service. Each step commits independently. If a later step fails, you run **compensating transactions** that undo the business effects of the earlier steps — not a physical rollback, a *semantic* undo. Refund the payment. Release the reservation. Cancel the order. The system converges on a consistent business state. This is the **saga pattern**, and the consistency it gives you is eventual, not ACID.
 
@@ -71,7 +71,7 @@ public Order placeOrder(PlaceOrder cmd) {
 public void onOrderCreated(OrderCreated e) {
     try {
         paymentGateway.charge(e.orderId(), e.amount());   // idempotency key = orderId
-        kafka.send("payments", new PaymentCharged(e.orderId()));
+        kafka.send("payments", new PaymentCharged(e.orderId(), e.items()));
     } catch (PaymentDeclined ex) {
         kafka.send("payments", new PaymentFailed(e.orderId(), ex.getReason()));
     }
@@ -123,11 +123,11 @@ public class OrderSagaOrchestrator {
     public void runSaga(UUID sagaId, PlaceOrder cmd) {
         sagaState.start(sagaId);                          // durable state FIRST
         try {
-            inventoryClient.reserve(sagaId, cmd.items()); // step 1
-            sagaState.stepDone(sagaId, "INVENTORY_RESERVED");
-
-            paymentClient.charge(sagaId, cmd.amount());   // step 2
+            paymentClient.charge(sagaId, cmd.amount());   // step 1
             sagaState.stepDone(sagaId, "PAYMENT_CHARGED");
+
+            inventoryClient.reserve(sagaId, cmd.items()); // step 2
+            sagaState.stepDone(sagaId, "INVENTORY_RESERVED");
 
             shippingClient.ship(sagaId, cmd.address());   // step 3
             sagaState.complete(sagaId);
