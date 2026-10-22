@@ -30,7 +30,7 @@ Each item links the official migration material that documents it — mostly the
 
 - **The `.and()` DSL is gone.** The old chain-style configuration was deprecated in 6.1 and removed in 7.0; the **lambda DSL is now mandatory**. Every config snippet from the Security 5 era needs rewriting, and OpenRewrite can automate much of it.
 - **`authorizeRequests` is gone** — deprecated in 6.0, removed in 7.0; use `authorizeHttpRequests`.
-- **`AntPathRequestMatcher` and `MvcRequestMatcher` are gone** — per the migration guide's [web migrations](https://docs.spring.io/spring-security/reference/6.5/migration-7/web.html), Security 7 "will use `PathPatternRequestMatcher` by default."
+- **`AntPathRequestMatcher` and `MvcRequestMatcher` are gone** — the migration guide's [web migrations](https://docs.spring.io/spring-security/reference/6.5/migration-7/web.html) says it directly: "In Spring Security 7, `AntPathRequestMatcher` and `MvcRequestMatcher` are no longer supported," and Security 7 uses `PathPatternRequestMatcher` (in `org.springframework.security.web.servlet.util.matcher`) by default. The 7.x API docs bear that out: the old classes no longer have pages, `PathPatternRequestMatcher` does.
 - **The OAuth2 password grant is removed** (OAuth 2.1 calls it legacy) — the 6.5 reference already announced it "will be removed in Spring Security 7." If something in your system still uses it, that's a migration project of its own.
 - **The legacy Access API moved out** — as of Security 7, `AccessDecisionManager`, `AccessDecisionVoter`, and friends live in a legacy module, `spring-security-access`, per the [authorization reference](https://docs.spring.io/spring-security/reference/servlet/authorization/index.html). Expect import churn, not a rewrite.
 
