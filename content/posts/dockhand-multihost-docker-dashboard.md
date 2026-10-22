@@ -35,7 +35,7 @@ Dockhand itself is a single container. It manages its own host through the Docke
 ```yaml
 services:
   dockhand:
-    image: fnsys/dockhand:1.0.54
+    image: fnsys/dockhand:v1.0.54
     container_name: dockhand
     restart: unless-stopped
     ports:
@@ -123,13 +123,13 @@ docker rm -f hawser
 # (Standard or Edge variant) — --restart unless-stopped brings it back up
 ```
 
-Read the release notes before pulling the hub — Dockhand ships fast (1.0.48 → 1.0.54 in about a month), and stack-management software is exactly the thing you don't auto-upgrade blind. Pin, read, then pull. Same discipline for the agent: Hawser publishes versioned releases, so if you'd rather pin than float on `:latest`, put the version tag in both the install `docker run` and the update pull above — just keep the two in sync.
+Read the release notes before pulling the hub — Dockhand ships fast (1.0.48 → 1.0.54 in about a month), and stack-management software is exactly the thing you don't auto-upgrade blind. Pin, read, then pull. One detail that bites: Dockhand's image tags carry a `v` prefix (`fnsys/dockhand:v1.0.54`); `fnsys/dockhand:1.0.54` does not exist and the pull fails. Same discipline for the agent: Hawser publishes versioned releases, so if you'd rather pin than float on `:latest`, list the registry's tags first, then put the exact tag in both the install `docker run` and the update pull above — just keep the two in sync.
 
 ## Cheat sheet
 
 | Task | How |
 |---|---|
-| Hub install | `fnsys/dockhand:1.0.54`, port `3000`, socket mount, `dockhand_data:/app/data`, pinned tag |
+| Hub install | `fnsys/dockhand:v1.0.54` (note the `v` prefix), port `3000`, socket mount, `dockhand_data:/app/data`, pinned tag |
 | LAN host | Hawser Standard mode: listens on `2376`, `TOKEN` required |
 | VPS / NAT host | Hawser Edge mode: dials out via `wss://…/api/hawser/connect` |
 | Agent image | `ghcr.io/finsys/hawser:latest` + `/var/run/docker.sock` mount |
