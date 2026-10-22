@@ -97,7 +97,7 @@ public ObjectMapper objectMapper() {   // com.fasterxml.jackson version
 Boot sees a `com.fasterxml.jackson` bean, shrugs, and configures its own `tools.jackson` `JsonMapper` with defaults. Your `FAIL_ON_NULL_FOR_PRIMITIVES` setting never reaches the `RestClient` — and because Jackson 3 fails on null primitives by default, the flipped default is what your API gets. The fix is mechanical but must be complete — and the idiomatic Boot fix is a customizer, not a replacement bean:
 
 ```java
-import org.springframework.boot.jackson.JsonMapperBuilderCustomizer;
+import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import tools.jackson.databind.DeserializationFeature;
 
 // Recommended: customize Boot's auto-configured mapper instead of replacing it
