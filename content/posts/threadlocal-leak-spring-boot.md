@@ -119,12 +119,19 @@ private static final ScopedValue<TenantContext> CURRENT = ScopedValue.newInstanc
 
 // bind for exactly one scope — no remove() exists because none is needed.
 // call(), not run(): run() takes a Runnable, which cannot throw the checked
-// IOException/ServletException that chain.doFilter declares; call() propagates
-// them through its generic signature so the enclosing method can rethrow them.
-ScopedValue.where(CURRENT, TenantContext.from(req)).call(() -> {
-    chain.doFilter(req, res);
-    return null;
-});
+// IOException/ServletException that chain.doFilter declares. But call() infers
+// a single exception type from the lambda body — here Exception — so the
+// catch clauses below narrow it back to what doFilterInternal declares.
+try {
+    ScopedValue.where(CURRENT, TenantContext.from(req)).call(() -> {
+        chain.doFilter(req, res);
+        return null;
+    });
+} catch (IOException | ServletException | RuntimeException e) {
+    throw e;
+} catch (Exception e) {
+    throw new IllegalStateException(e);  // unreachable in practice
+}
 // outside the scope, the binding is simply gone
 ```
 
