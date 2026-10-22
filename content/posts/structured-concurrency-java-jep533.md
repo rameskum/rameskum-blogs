@@ -66,7 +66,7 @@ UserProfile loadProfile(String userId) throws ExecutionException, InterruptedExc
 
 Four things to notice:
 
-- **`open(...)` takes a `Joiner`, not a constructor call.** The joiner is the completion policy: what `join()` returns and what it throws. Create a fresh joiner per scope — the JEP is explicit that joiners must never be reused across scopes.
+- **`open(...)` takes a `Joiner`, not a constructor call.** The joiner is the completion policy: what `join()` returns and what it throws. Create a fresh joiner per scope — the `Joiner` Javadoc is explicit that joiner objects "should never be shared with different scopes or re-used after a scope is closed."
 - **`fork()` returns a `Subtask`, not a `Future`.** The old API returned `Future`, which invited the familiar-but-wrong `get()`-anywhere pattern. `Subtask` exposes `state()` and `get()`, meant to be read *after* `join()` returns.
 - **`join()` throws `ExecutionException`** with the failed subtask's exception as the cause when the outcome is a failure — one place where all errors surface, instead of N `future.get()` calls each throwing.
 - **The try-with-resources is the structure.** When the block exits, every subtask is done — no orphans, by construction. That guarantee is the entire point.
