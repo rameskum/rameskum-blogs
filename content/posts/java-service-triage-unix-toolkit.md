@@ -27,7 +27,7 @@ keywords:
 
 It's 3 A.M. PagerDuty is screaming, the error rate graph looks like a hockey stick, and your Java service is dying. You have SSH, a shell, and about ten minutes before someone important wakes up.
 
-This is the triage ladder I actually run, in order, with the exact one-liners. The order matters: every step rules out a class of problem before you spend time on the next one. If you did the hardening from the [Linux Server Setup](/posts/linux-server-setup-vps-hardening/) post, this is its companion — that one was pre-incident, this one is during.
+This is the triage ladder I actually run, in order, with the exact one-liners. The order matters: every step rules out a class of problem before you spend time on the next one. If you did the hardening from the [Linux Server Setup](/posts/linux-server-setup/) post, this is its companion — that one was pre-incident, this one is during.
 
 ```mermaid
 flowchart TD

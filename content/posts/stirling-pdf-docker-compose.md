@@ -96,7 +96,7 @@ These are only used while the database has no users, so they do nothing on an ex
 
 There is also a `SECURITY_ENABLELOGIN=false` option that runs the server with no login at all. The docs warn, in so many words, that anyone who can reach the server can then use it. Treat that setting as LAN-only, behind a reverse proxy you control, and never pair it with a public URL. For a household, the right setup is login on, served behind your existing reverse proxy.
 
-If you run Traefik already, the usual pattern applies: bind the port to localhost instead of every interface (`'127.0.0.1:8080:8080'`), point a router at `stirling-pdf:8080`, and let your existing auth layer sit in front. The docs also note an optional sub-path setting (`SYSTEM_ROOTURIPATH`, e.g. `/pdf`) if you want it under a path rather than a subdomain.
+If you already run a reverse proxy, stop publishing the port on every interface. A proxy installed on the host (Caddy, nginx) only needs the port bound to localhost (`'127.0.0.1:8080:8080'`). A proxy running in Docker, like Traefik, doesn't use the published port at all: drop the `ports:` mapping, put the service on the proxy's external network, and point a router at `stirling-pdf:8080` (the [Wallos guide](/posts/wallos-selfhost-subscription-tracker/) walks through that exact label set). Either way, your existing auth layer sits in front. The docs also note an optional sub-path setting (`SYSTEM_ROOTURIPATH`, e.g. `/pdf`) if you want it under a path rather than a subdomain.
 
 ## The tools you actually came for
 
@@ -182,4 +182,4 @@ tar -czf stirling-pdf-backup-$(date +%F).tar.gz stirling-data
 docker compose up -d
 ```
 
-One container, one data directory, fifty tools, and the document you just OCR'd never left your house. That is the whole argument — and it is the next entry in the replace-paid-software run, right after Wallos took over subscription tracking.
+One container, one data directory, fifty tools, and the document you just OCR'd never left your house. That is the whole argument — and it is the next entry in the replace-paid-software run, right after [Wallos took over subscription tracking](/posts/wallos-selfhost-subscription-tracker/).
