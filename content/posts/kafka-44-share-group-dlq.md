@@ -26,32 +26,36 @@ keywords:
 
 Apache Kafka 4.4.0 landed on October 22, 2026 — 25 KIPs and 963 commits since 4.3.0. Three things in it are worth your attention: share groups finally get dead-letter queues, Kafka Streams gets transactional state stores, and one storage change can surprise you during an upgrade. There is also a safety note that comes *before* all of it.
 
-## First: if you run tiered storage, patch to 4.3.2 first
+## First: if you run 4.3.x, patch to 4.3.2 first
 
-Kafka 4.3.2 shipped the very next day, October 23, and it is not a routine bugfix release. It fixes around 60 issues, including two potential data-loss bugs in tiered storage:
+Kafka 4.3.2 shipped the very next day, October 23, and it is not a routine bugfix release. It fixes around 60 issues, including two potential data-loss bugs:
 
-- **KAFKA-20732** — size-based retention could delete data that was still within retention from *both* the local and remote tiers after a leader election.
-- **KAFKA-20979** — the time index could be truncated across a broker restart, causing segments still within retention to be deleted by time-based retention.
+- **KAFKA-20732** (tiered storage only) — size-based retention could delete data that was still within retention from *both* the local and remote tiers after a leader election.
+- **KAFKA-20979** (not specific to tiered storage) — the time index could be truncated across a broker restart, causing segments still within retention to be deleted by time-based retention.
 
-If you run tiered storage on 4.3.0 or 4.3.1, go to 4.3.2 (or straight to 4.4.0, which includes the fixes) before you do anything else in this post. The rest of it can wait; data loss cannot.
+If you run 4.3.0 or 4.3.1, go to 4.3.2 (or straight to 4.4.0, which includes the fixes) before you do anything else in this post. KAFKA-20979 can hit any topic, tiered or not, and KAFKA-20732 matters if you use tiered storage. The rest of this post can wait; data loss cannot.
 
 ## Share-group DLQs: poison messages finally have somewhere to go
 
-Share groups — Kafka's queue semantics from KIP-932 — let multiple consumers cooperatively work through a topic, past the one-consumer-per-partition limit of classic consumer groups. Each record carries a delivery count, and a record that keeps failing eventually hits its delivery limit. Before 4.4, that record just went to the **Archived** state. Archived and invisible: no way to find it, inspect it, or replay it. For a payments pipeline, that is not error handling, it is a black hole.
+Share groups — Kafka's queue semantics from KIP-932 — let multiple consumers cooperatively work through a topic, past the one-consumer-per-partition limit of classic consumer groups. (If you read my earlier post on [dead letter queues and poison messages](/posts/dead-letter-queues-poison-messages/) and its "archive, don't DLQ" gotcha: this is the fix for it.) Each record carries a delivery count, and a record that keeps failing eventually hits its delivery limit. Before 4.4, that record just went to the **Archived** state. Archived and invisible: no way to find it, inspect it, or replay it. For a payments pipeline, that is not error handling, it is a black hole.
 
 KIP-1191 fixes that. A share group can now name a dead-letter queue topic. When a record is explicitly rejected by the consumer, or it exhausts its delivery attempts, it moves to a new **Archiving** state, a record is written to the DLQ topic, and only then does it become **Archived**.
 
-### The setup: three knobs, all opt-in
+### The setup: three layers, all opt-in
 
 DLQs are off by default, and every layer has to agree:
 
 ```bash
-# 1. The topic must be allowed to serve as a DLQ topic (default: false)
+# 1. Turn the feature on, once every broker runs 4.4
+bin/kafka-features.sh --bootstrap-server localhost:9092 \
+  upgrade --feature share.version=2
+
+# 2. The topic must be allowed to serve as a DLQ topic (default: false)
 bin/kafka-topics.sh --bootstrap-server localhost:9092 \
   --alter --topic dlq.payments \
   --config errors.deadletterqueue.group.enable=true
 
-# 2. The group names its DLQ topic (default: blank = no DLQ)
+# 3. The group names its DLQ topic (default: blank = no DLQ)
 bin/kafka-configs.sh --bootstrap-server localhost:9092 \
   --alter --entity-type groups --entity-name payments \
   --add-config errors.deadletterqueue.topic.name=dlq.payments
@@ -59,7 +63,7 @@ bin/kafka-configs.sh --bootstrap-server localhost:9092 \
 
 Two more defaults worth knowing. The broker only permits DLQ topic names starting with `dlq.` (`errors.deadletterqueue.topic.name.prefix`, default `"dlq."`) — this is a security control, not cosmetics: without it, a share group could be pointed at any topic and the broker would write into it. And the broker does *not* auto-create DLQ topics by default (`errors.deadletterqueue.auto.create.topics.enable`, default `false`); flip it on if you want the topics created for you.
 
-One gate matters most: DLQs require the `share.version` feature to be upgraded to **2**, meaning every broker in the cluster must support it before the feature switches on. Rolling upgrade to 4.4 first, feature upgrade second.
+Step 1 is the gate that matters most: DLQs require the `share.version` feature to be at **2**, which only switches on when every broker in the cluster supports it. Rolling upgrade to 4.4 first, feature upgrade second. Without it, DLQs are not enabled, whatever the group and topic configs say.
 
 ### What lands on the DLQ topic
 
@@ -84,6 +88,7 @@ The whole feature hinges on one consumer behavior: when a record is unprocessabl
 Properties props = new Properties();
 props.put("bootstrap.servers", "localhost:9092");
 props.put("group.id", "payments");
+props.put("share.acknowledgement.mode", "explicit");
 props.put("key.deserializer", StringDeserializer.class.getName());
 props.put("value.deserializer", StringDeserializer.class.getName());
 
@@ -105,7 +110,7 @@ try (KafkaShareConsumer<String, String> consumer = new KafkaShareConsumer<>(prop
 }
 ```
 
-`ACCEPT` and `RELEASE` behave as before; `REJECT` is the new fast path to the DLQ. (Snippet compile-checked against kafka-clients 4.4.0; not run against a live cluster.)
+Explicit acknowledgement mode is required for per-record `acknowledge()` calls: in the default implicit mode, the next `poll()` acknowledges everything delivered as accepted. `ACCEPT` and `RELEASE` behave as before; `REJECT` is the new fast path to the DLQ. (Snippet compile-checked against kafka-clients 4.4.0; not run against a live cluster.)
 
 ### Three honest caveats
 
@@ -143,13 +148,13 @@ This one will not show up in staging if staging is built fresh with matching ver
 ## Also in 4.4, briefly
 
 - **Cheaper tiered storage (KIP-1241):** `remote.copy.lag.bytes` and `remote.copy.lag.ms` let you delay uploads to remote storage, cutting the redundancy of copying data that is about to be deleted anyway.
-- **DNS resilience (KIP-909):** `bootstrap.resolve.timeout.ms` controls how clients handle bootstrap DNS resolution failures instead of failing fast.
+- **DNS resilience (KIP-909):** a new client config, `bootstrap.resolve.timeout.ms`, opts into asynchronous bootstrap DNS resolution: the client constructor returns immediately and resolution failures surface later instead of at startup. The default `0` keeps the old synchronous behavior, the feature is marked as evolving, and Kafka Streams and Connect do not support it yet.
 - **Security fix worth upgrading for:** CVE-2026-111115 — a broker out-of-memory via tagged-field allocation amplification in flexible protocol parsing — is fixed in 4.4.0 (and backported to 4.2.2 and 4.3.2). The fix caps tagged-field sections at 10,000 fields before allocation.
 - **Deprecation:** `broker.id` is deprecated in favor of `node.id` (KIP-1232) and goes away in Kafka 5.0.
 
 ## The upgrade order
 
-1. Tiered storage on 4.3.x? Patch to 4.3.2 first — the data-loss fixes are the priority.
+1. On 4.3.x? Patch to 4.3.2 first — the data-loss fixes are the priority.
 2. Rolling upgrade to 4.4.0. Read the "Upgrading to 4.4" notes first; the KIP-1170 formatting rule affects any node you reformat.
 3. Upgrade the `share.version` feature to 2, then configure DLQ topics per group. Start with `copy.record.enable` off.
 4. Enable transactional state stores in staging only, watch memory during rebalances, and promote after a clean soak.
