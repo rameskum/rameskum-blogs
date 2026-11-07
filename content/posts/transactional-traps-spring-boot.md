@@ -25,7 +25,7 @@ keywords:
 
 `@Transactional` is the most trusted annotation in Spring Boot — and the most quietly misunderstood. It looks like one annotation doing one job: wrap this method in a transaction. In practice it is a proxy, a set of defaults inherited from EJB, and a handful of hints to Hibernate, and each of those has a sharp edge. None of the five traps below throws an error at the point where you make the mistake. They all fail silently, in production, weeks later.
 
-Every trap in this post is reproduced with a real test, not a thought experiment. The harness is Spring Boot 4.1.2 (Spring Framework 7.0.10, Hibernate 7.4.13) against an in-memory H2 database, JUnit 6, 11 tests — one that demonstrates each trap, one that proves each fix. The full setup is two services, four small entities, and a test class; the snippets below are the real code, trimmed only where the trimming is obvious.
+Every trap in this post is reproduced with a real test, not a thought experiment. The harness is Spring Boot 4.1.2 (Spring Framework 7.0.10, Hibernate 7.4.13) against an in-memory H2 database, JUnit 6, 11 tests - seven that demonstrate the traps (trap 4 needs three) and four that prove the fixes. The full setup is two services, four small entities, and a test class; the snippets below are the real code, trimmed only where the trimming is obvious.
 
 The domain is deliberately boring: orders, audit logs, payments, customers. The bugs are the interesting part.
 
@@ -107,7 +107,7 @@ void fix1_separateBeanRequiresNewSurvives() {
 }
 ```
 
-Two alternatives exist and both are worse: inject the bean's own proxy into itself and call through it (works, smells), or enable `exposeProxy = true` and call `AopContext.currentProxy()` (couples your code to Spring AOP). Splitting the bean is the fix that stays fixed. One related rule from Spring's own docs: when using proxies, annotate only **public** methods — a `private @Transactional` method is silently ignored for the same reason. (AspectJ weaving, which modifies bytecode instead of proxying, does not have this limitation — but that is a different setup, not the Boot default.)
+Two alternatives exist and both are worse: inject the bean's own proxy into itself and call through it (works, smells), or enable `exposeProxy = true` and call `AopContext.currentProxy()` (couples your code to Spring AOP). Splitting the bean is the fix that stays fixed. One related rule from Spring's own docs: `@Transactional` is typically used on public methods. Since Spring Framework 6.0, protected and package-visible methods also work with class-based proxies (Boot's default), but a `private @Transactional` method is still silently ignored, for the same reason. (AspectJ weaving, which modifies bytecode instead of proxying, does not have this limitation — but that is a different setup, not the Boot default.)
 
 ## Trap 2: the checked exception that commits
 
@@ -151,7 +151,7 @@ void fix2_rollbackForCheckedException() {
 }
 ```
 
-The rule of thumb that survives contact with production: use unchecked exceptions for anything that should roll a transaction back, and reserve checked exceptions for outcomes the caller is expected to handle *without* undoing the work. If your codebase already has checked business exceptions everywhere, `rollbackFor` on each method works — and since Spring Framework 6.2 there is also a global switch: you can change the default rollback behaviour application-wide instead of annotating every method (the Spring team itself now recommends switching the default to `Exception.class` unless you rely on EJB-style checked-exception commit behaviour).
+The rule of thumb that survives contact with production: use unchecked exceptions for anything that should roll a transaction back, and reserve checked exceptions for outcomes the caller is expected to handle *without* undoing the work. If your codebase already has checked business exceptions everywhere, `rollbackFor` on each method works — and since Spring Framework 6.2 there is also a global switch: you can change the default rollback behaviour application-wide with `@EnableTransactionManagement(rollbackOn = RollbackOn.ALL_EXCEPTIONS)` instead of annotating every method (the Spring reference docs advise switching to `ALL_EXCEPTIONS` unless you rely on EJB-style checked-exception commit behaviour).
 
 One more edge of the same rule: if you **catch** an exception inside the method and don't rethrow, the proxy sees a clean return and commits — the interceptor can only react to what escapes. Caught-and-swallowed is a commit, every time, unless you call `TransactionAspectSupport.currentTransactionStatus().setRollbackOnly()` yourself.
 
@@ -304,7 +304,7 @@ public List<String> listAllOrderItemsLazy() {
 }
 ```
 
-`Customer.orders` is a lazy `@OneToMany`. Outside a transaction, touching it throws `LazyInitializationException` — loud, obvious, fixed on the spot. Inside a `@Transactional` method the session is open, so every lazy access *works*. It just costs one extra query per customer. With 3 customers holding 2 orders each, Hibernate statistics report 4 prepared statements: 1 to load the customers, 1 per customer to load their orders. With 3,000 customers it is 3,001.
+`Customer.orders` is a lazy `@OneToMany`. Outside a transaction, touching it throws `LazyInitializationException` (unless Open Session in View is active - Boot turns `spring.jpa.open-in-view` on by default for web apps) - loud, obvious, fixed on the spot. Inside a `@Transactional` method the session is open, so every lazy access *works*. It just costs one extra query per customer. With 3 customers holding 2 orders each, Hibernate statistics report 4 prepared statements: 1 to load the customers, 1 per customer to load their orders. With 3,000 customers it is 3,001.
 
 ```java
 @Test
@@ -344,7 +344,7 @@ Fetch joins and `@EntityGraph` are the usual fixes; `@BatchSize` is the middle g
 
 | Trap | Symptom | Root cause | Fix |
 | --- | --- | --- | --- |
-| Self-invocation | `REQUIRES_NEW` silently ignored | Call never crosses the proxy | Separate bean; annotate only public methods |
+| Self-invocation | `REQUIRES_NEW` silently ignored | Call never crosses the proxy | Separate bean (and never `private` methods) |
 | Checked exception | Failure commits half the work | Rollback only on unchecked, by default | `rollbackFor`, or unchecked exceptions |
 | Caught inner failure | `UnexpectedRollbackException` at commit | Inner failure marks the shared tx rollback-only | `REQUIRES_NEW` (or `NESTED` savepoint) in a separate bean |
 | `readOnly` | Writes vanish silently — or land anyway | Read-only session + MANUAL flush; IDENTITY inserts fire on `persist()` | Treat `readOnly` as a perf hint, never a guard |
@@ -355,7 +355,7 @@ The through-line: `@Transactional` is not a declaration about your method. It is
 ## Sources
 
 - Spring Framework reference, [Declarative transaction management](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative.html) — rollback rules, propagation, and the proxy model.
-- Spring Data JPA reference, [Transactions](https://docs.spring.io/spring-data/jpa/reference/jpa.transactions.html) — `readOnly` as a hint; Hibernate flush mode set to `NEVER`/`MANUAL` in read-only transactions.
-- Spring Framework 6.2 release notes — global default rollback configuration.
+- Spring Data JPA reference, [Transactions](https://docs.spring.io/spring-data/jpa/reference/jpa/transactions.html) — `readOnly` as a hint; Hibernate flush mode set to `MANUAL` in read-only transactions.
+- Spring Framework reference, [Using @Transactional](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/annotations.html) — method visibility in proxy mode, and the 6.2 global default rollback configuration (`rollbackOn`).
 - Baeldung, [Handling UnexpectedRollbackException in Spring](https://www.baeldung.com/spring-unexpected-rollback-exception) — the rollback-only propagation scenario.
-- All 11 tests run on Spring Boot 4.1.2 (Spring Framework 7.0.10, Hibernate 7.4.13, H2 2.4.240, JUnit 6.0.3, JDK 25): 5 trap demonstrations, 5 fixes, plus the readOnly flush probe — all passing.
+- All 11 tests run on Spring Boot 4.1.2 (Spring Framework 7.0.10, Hibernate 7.4.13, H2 2.4.240, JUnit 6.0.3, JDK 25): 7 trap demonstrations (trap 4 has three variants) and 4 fixes (`readOnly` has none, by design) — all passing.
