@@ -108,9 +108,9 @@ One more from the same investigation: `x-delivery-count` travels with the messag
 Kafka 4.2 made share groups production-ready: many consumers sharing partitions with per-record acknowledgements (`ACCEPT` / `RELEASE` / `REJECT`). The poison-message story here is genuinely better than classic consumer groups — a poison record no longer blocks its partition. But know the semantics:
 
 - The broker enforces `group.share.delivery.count.limit` (**default 5**). Past that, the record is **archived**: no member of the group gets it again, but it is *not* copied anywhere — no DLQ topic, no alert, nothing. The record still exists on the log (a plain consumer can read it back), but your application will never see it again.
-- KIP-1191 (dead-letter topics for share groups) **shipped in Kafka 4.4.0**. On 4.3 and earlier, "archived" means your code must notice: track `delivery_count` in the record metadata and `REJECT` (or copy to your own DLQ topic) *before* the broker archives it silently. On 4.4+ you can configure a DLQ topic for the group instead - it is off by default, so an unconfigured group still archives silently. Setup and caveats are in [Kafka 4.4 Is Out](/posts/kafka-44-share-group-dlq/).
+- KIP-1191 (dead-letter topics for share groups) **shipped in Kafka 4.4.0**. On 4.3 and earlier, "archived" means your code must notice: track `delivery_count` in the record metadata and `REJECT` (or copy to your own DLQ topic) *before* the broker archives it silently. On 4.4+ you can configure a DLQ topic for the group instead - it is off by default, so an unconfigured group still archives silently, and DLQ records carry only `__dlq.errors.*` headers unless you also set `errors.deadletterqueue.copy.record.enable=true`. Setup and caveats are in [Kafka 4.4 Is Out](/posts/kafka-44-share-group-dlq/).
 
-The interview answer: *"Share groups fix the head-of-line blocking that makes poison messages deadly in consumer groups, but their DLQ story used to be 'archive and move on' — on 4.3 and earlier, if you need the quarantined payload for replay, build the DLQ copy yourself; from 4.4, KIP-1191 gives share groups a real DLQ topic, but you have to enable it."*
+The interview answer: *"Share groups fix the head-of-line blocking that makes poison messages deadly in consumer groups, but their DLQ story used to be 'archive and move on' — on 4.3 and earlier, if you need the quarantined payload for replay, build the DLQ copy yourself; from 4.4, KIP-1191 gives share groups a real DLQ topic, but you have to enable it, and for replay you also need `errors.deadletterqueue.copy.record.enable` so the payload is copied, not just the error headers."*
 
 ## Alert vs auto-retry: the decision rules
 
@@ -124,7 +124,7 @@ And the replay playbook: fix the bug first, then replay from oldest to newest, w
 
 ## The 2-minute interview answer
 
-> "A poison message is a record that will never process successfully. Without handling, it either retries forever or blocks its partition. The pattern is: retry with exponential backoff on non-blocking retry topics, cap attempts, then quarantine to a DLQ with the failure context attached, and alert. In Spring Kafka that's `@RetryableTopic` plus `@DltHandler`, with the DLT as a normal topic your handler owns. In RabbitMQ you wire `x-dead-letter-exchange` on the queue and use `x-delivery-limit` on quorum queues — classic queues need the consumer to count attempts itself. Two current gotchas: since RabbitMQ 4.3, `basic.nack(requeue=true)` doesn't count toward the delivery limit — use reject — and Kafka share groups archive poison records after 5 deliveries by default instead of dead-lettering them, so build your own DLQ copy on 4.3 and earlier - KIP-1191 shipped in 4.4.0, but the DLQ is opt-in. And a DLQ nobody monitors is just a trash can — alert on growth, replay only after the fix."
+> "A poison message is a record that will never process successfully. Without handling, it either retries forever or blocks its partition. The pattern is: retry with exponential backoff on non-blocking retry topics, cap attempts, then quarantine to a DLQ with the failure context attached, and alert. In Spring Kafka that's `@RetryableTopic` plus `@DltHandler`, with the DLT as a normal topic your handler owns. In RabbitMQ you wire `x-dead-letter-exchange` on the queue and use `x-delivery-limit` on quorum queues — classic queues need the consumer to count attempts itself. Two current gotchas: since RabbitMQ 4.3, `basic.nack(requeue=true)` doesn't count toward the delivery limit — use reject — and Kafka share groups archive poison records after 5 deliveries by default instead of dead-lettering them, so build your own DLQ copy on 4.3 and earlier - KIP-1191 shipped in 4.4.0, but the DLQ is opt-in and copies only error headers unless payload copying is enabled. And a DLQ nobody monitors is just a trash can — alert on growth, replay only after the fix."
 
 ## Cheat sheet
 
@@ -134,7 +134,7 @@ And the replay playbook: fix the bug first, then replay from oldest to newest, w
 | Attempt cap | `attempts` on the annotation | `x-delivery-limit` (quorum only) |
 | Quarantine | `orders-dlt` + `@DltHandler` | `x-dead-letter-exchange` + DLQ binding |
 | Classic/consumer-group caveat | Blocking retry stalls the partition | Classic queues: consumer must count attempts |
-| 2026 gotcha | Share groups *archive* after 5 — DLQ only from 4.4, opt-in | 4.3+: nack doesn't count; use reject |
+| 2026 gotcha | Share groups *archive* after 5 — DLQ only from 4.4, opt-in, headers-only by default | 4.3+: nack doesn't count; use reject |
 | The human part | `@DltHandler` should alert, not just log | Monitor DLQ depth; replay after the fix |
 
 Poison messages are inevitable; poison *outages* are a choice. Cap the attempts, quarantine with context, and make sure a human finds out — that's the whole pattern.
