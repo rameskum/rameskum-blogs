@@ -86,7 +86,7 @@ static int missingNumberXor(int[] nums) {
 }
 ```
 
-Every present value appears twice across the indices and the array and cancels (`x ^ x == 0`); only the missing value survives. Prefer XOR over the sum formula `n(n+1)/2 - sum`: the sum overflows an `int` once `n` passes 65,535, and XOR has no such ceiling. Both versions are in the test run below, checked against each other on 500 random inputs.
+Every present value appears twice across the indices and the array and cancels (`x ^ x == 0`); only the missing value survives. Prefer XOR over the sum formula `n(n+1)/2 - sum`: the sum formula overflows an `int` once `n` passes 46,340 (`n * (n + 1)` exceeds `Integer.MAX_VALUE` before the division), and XOR has no such ceiling. Both versions are in the test run below, checked against each other on 500 random inputs.
 
 ## Problem 2: Find All Duplicates (LeetCode 442)
 
@@ -167,7 +167,7 @@ The pattern needs a value-to-index mapping. No mapping, no pattern:
 - **Input must not be mutated** — the placement pass rearranges the array. For Missing Number, XOR keeps O(n)/O(1) without touching the input; for the other two, the honest fallback is a `HashSet` at O(n) space. Name the tradeoff; don't pretend the constraint away.
 - **Duplicates with no guard rule** — if your swap condition can fire on equal values, the loop doesn't terminate (see Problem 2). Before trusting any placement loop, check the invariant: *every swap must put a value in its final home, and a value already home must never move.* If either half fails, the O(n) bound fails with it.
 
-The natural follow-up exercise is LeetCode 448 (Find All Numbers Disappeared): same placement loop as Problem 2, but the scan collects the *missing* values (`i + 1` at each mismatched index) instead of the misplaced ones. And 287 (Find the Duplicate Number) is the deliberate counterexample — it forbids modifying the array, which rules cyclic sort out and pushes you to Floyd's cycle detection instead. Knowing which constraint kills which technique is the actual interview skill.
+The natural follow-up exercise is LeetCode 448 (Find All Numbers Disappeared): same placement loop as Problem 2, but the scan collects the *missing* values (`i + 1` at each mismatched index) instead of the misplaced ones. And 287 (Find the Duplicate Number) is the deliberate counterexample — it forbids modifying the array, which rules cyclic sort out and pushes you to [Floyd's cycle detection](/posts/floyd-cycle-detection-java/) instead. Knowing which constraint kills which technique is the actual interview skill.
 
 ## Prove it: 12 tests, three brute-force checks
 
