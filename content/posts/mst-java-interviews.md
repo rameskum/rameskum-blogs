@@ -43,7 +43,7 @@ Both algorithms are just these two facts, applied greedily.
 
 **Cut property.** Split the nodes into any two groups. The cheapest edge crossing between them belongs to *some* MST. That's Prim's engine: grow one tree, and at every step add the cheapest edge crossing the cut between the tree and everything else.
 
-**Cycle property.** Take any cycle. Its heaviest edge belongs to *no* MST — removing it keeps the graph connected and strictly lowers the cost. That's Kruskal's engine: consider edges cheapest-first, and skip any edge that closes a cycle.
+**Cycle property.** Take any cycle. An edge that is strictly heavier than every other edge on the cycle belongs to *no* MST — dropping it keeps the graph connected and lowers the cost. (If several edges tie for heaviest, some MST may still contain one of them; the all-equal triangle below is the example.) That's Kruskal's engine: consider edges cheapest-first, and skip any edge that closes a cycle.
 
 If you remember nothing else, remember this: Kruskal rejects edges that form cycles, Prim accepts edges that cross the cut. Same answer, opposite directions. (Both from CLRS chapter 23, where the proofs live.)
 
@@ -147,7 +147,7 @@ public static Result prim(int n, List<List<Edge>> adj) {
 }
 ```
 
-Complexity is O(E log V) with a binary heap: every edge is pushed once and popped at most once. (With a Fibonacci heap it's O(E + V log V), which is the answer if the interviewer pushes on complexity — and the reason nobody implements it in an interview.)
+Complexity is O(E log V) with a binary heap: each adjacency entry is pushed at most once and popped at most once (so at most 2E heap operations), which is O(E log E) = O(E log V). (With a Fibonacci heap it's O(E + V log V), which is the answer if the interviewer pushes on complexity — and the reason nobody implements it in an interview.)
 
 The `if (visited[node]) continue;` line is the whole trap, and it's worth understanding exactly why. The heap is *lazy*: when a node is first reached over an expensive edge, an entry for it is pushed; when it's later reached over a cheaper edge, a second entry is pushed, and the cheaper one pops first and finalizes the node. The expensive entry is still sitting in the heap. Without the visited check, it pops later and its weight gets added a second time.
 
@@ -168,17 +168,17 @@ The outer loop over `start` is the disconnected-graph handling: when the heap em
 | Input shape | Edge list | Adjacency list |
 | Core structure | Union-Find | Priority queue |
 | Complexity | O(E log E) | O(E log V) with a binary heap |
-| Natural on | Sparse graphs (sort is cheap) | Dense graphs (heap beats sorting E edges) |
+| Natural on | Sparse graphs (sort is cheap) | Dense graphs (the O(V²) array-based Prim avoids sorting E edges; with a binary heap the two are the same O(E log V)) |
 | Disconnected input | Forest, naturally | Forest, with the restart loop |
-| Classic bug | Forgetting path compression | Forgetting the visited check on pop |
+| Classic bug | Forgetting path compression / union by rank (slow, not wrong) | Forgetting the visited check on pop |
 
 In an interview, the input shape usually decides for you: an edge list points at Kruskal, an adjacency list at Prim. Know both, because the follow-up is often "now do it the other way", and because the second-best MST below is easiest to explain from Kruskal's tree.
 
-Two more facts that come up as follow-ups. **Negative weights are fine** — MSTs don't care about them, unlike Dijkstra. A graph with a -1 edge just has a cheaper tree (verified: edges -1, 2, 3 give MST weight 1). **Equal weights mean the MST isn't unique.** A triangle with all edges weight 1 has three spanning trees, all weighing 2 — which is exactly why the second-best question needs a careful definition.
+Two more facts that come up as follow-ups. **Negative weights are fine** — MSTs don't care about them, unlike Dijkstra. A graph with a -1 edge just has a cheaper tree (verified: change edge 0-2 on the running example from 4 to -1 and the MST becomes 0-2:-1, 0-1:1, 2-3:1, weight 1). **Equal weights mean the MST isn't unique.** A triangle with all edges weight 1 has three spanning trees, all weighing 2 — which is exactly why the second-best question needs a careful definition.
 
 ## The follow-up: the second-best MST
 
-"Now find the cheapest spanning tree that isn't the MST." The definition matters before the algorithm does: second-best means strictly heavier than the MST. If equal-weight trees count, the question is trivial whenever any edge weight repeats.
+"Now find the cheapest spanning tree that isn't the MST." The definition matters before the algorithm does: second-best means strictly heavier than the MST. If equal-weight trees count, the question is trivial whenever any edge weight repeats. (CLRS Problem 23-1 defines it the other way: the best spanning tree different from the MST, so an equal-weight tree counts. Ask which definition the interviewer means.)
 
 The algorithm is a single edge swap. For every edge *not* in the MST, adding it to the tree creates exactly one cycle. Swapping out the heaviest edge on that cycle gives the cheapest tree that uses the new edge. Take the minimum over all non-tree edges, and that's the second-best MST.
 
@@ -204,6 +204,40 @@ public static OptionalInt secondBest(int n, List<Edge> edges) {
         best = Math.min(best, mst.weight() - swapOut + e.w());
     }
     return best == Integer.MAX_VALUE ? OptionalInt.empty() : OptionalInt.of(best);
+}
+```
+
+The snippet leans on three small helpers, shown here so everything compiles together:
+
+```java
+record Result(List<Edge> edges, int weight, int components) {}
+
+static List<List<Edge>> adjacency(int n, List<Edge> edges) {
+    List<List<Edge>> adj = new ArrayList<>();
+    for (int i = 0; i < n; i++) adj.add(new ArrayList<>());
+    for (Edge e : edges) { adj.get(e.u()).add(e); adj.get(e.v()).add(e); }
+    return adj;
+}
+
+/** @return {heaviest edge on the tree path s..t, heaviest edge on it strictly below limit} */
+static int[] maxAndSecondMaxOnPath(List<List<Edge>> tree, int s, int t, int limit) {
+    int n = tree.size();
+    int[] par = new int[n]; Edge[] pe = new Edge[n]; Arrays.fill(par, -2);
+    Deque<Integer> q = new ArrayDeque<>(); q.add(s); par[s] = -1;
+    while (!q.isEmpty()) {
+        int x = q.poll();
+        for (Edge e : tree.get(x)) {
+            int o = e.u() == x ? e.v() : e.u();
+            if (par[o] == -2) { par[o] = x; pe[o] = e; q.add(o); }
+        }
+    }
+    int mx = Integer.MIN_VALUE, lt = Integer.MIN_VALUE;
+    for (int x = t; x != s; x = par[x]) {
+        int w = pe[x].w();
+        mx = Math.max(mx, w);
+        if (w < limit) lt = Math.max(lt, w);
+    }
+    return new int[]{mx, lt};
 }
 ```
 
