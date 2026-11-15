@@ -46,7 +46,7 @@ static long maxSumSubarray(int[] nums, int k) {
     }
     long best = window;
     for (int r = k; r < nums.length; r++) {
-        window += nums[r] - nums[r - k]; // slide: add the newcomer, drop the leaver
+        window += (long) nums[r] - nums[r - k]; // slide: add the newcomer, drop the leaver
         best = Math.max(best, window);
     }
     return best;
@@ -59,7 +59,7 @@ Trace on the LeetCode 643 example, `[1, 12, -5, -6, 50, 3]`, `k = 4`:
 - Slide: `+50`, `-1` → `[12, -5, -6, 50]`, sum `51`. Best `51`.
 - Slide: `+3`, `-12` → `[-5, -6, 50, 3]`, sum `42`. Best stays `51`.
 
-LeetCode 643 asks for the maximum *average*, which is the same window: every window has length `k`, so the largest sum is the largest average — compare sums, divide once at the end (`51 / 4 = 12.75`). Dividing inside the loop would work but invites floating-point noise for no benefit. Two details worth naming: the accumulator is a `long`, so large inputs can't wrap the running sum the way an `int` sum can; and the `k` validation matches the problem's own constraint (`1 <= k <= n`), so `k = 0` and `k > n` fail loudly instead of returning a nonsense answer. Time O(n), space O(1).
+LeetCode 643 asks for the maximum *average*, which is the same window: every window has length `k`, so the largest sum is the largest average — compare sums, divide once at the end (`51 / 4 = 12.75`). Dividing inside the loop would work but invites floating-point noise for no benefit. Two details worth naming: the accumulator is a `long`, and the `(long)` cast widens `nums[r]` *before* the subtraction, so large inputs can't wrap either the running sum or the newcomer-minus-leaver difference the way `int` arithmetic can; and the `k` validation matches the problem's own constraint (`1 <= k <= n`), so `k = 0` and `k > n` fail loudly instead of returning a nonsense answer. Time O(n), space O(1).
 
 ## Problem 2: Variable window — longest substring without repeats (LeetCode 3)
 
