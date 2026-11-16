@@ -294,7 +294,7 @@ Gatherer.<Integer, Integer>ofSequential(
 // result: all 100 elements emitted, all 100 consumed
 ```
 
-The short-circuit silently did nothing. The rule is simple: use `ofGreedy` only when the integrator's `false` can only ever come from `downstream.push(...)` returning `false`. If your integrator ever decides to stop on its own — a predicate, a count, a sentinel — use the plain integrator form. A Greedy integrator behind a downstream `limit` still stops correctly (verified: 3 consumed with `limit(3)`), because downstream rejection is handled by the framework; it is only *your own* short-circuit decision that gets ignored.
+The short-circuit silently did nothing. (That run used a sized source, a `List` of 100 elements. If an upstream `limit` makes the pipeline short-circuiting anyway, for example `Stream.iterate(1, i -> i + 1).limit(100)`, the library still stops after 2 even with the Greedy declaration, so the bug can hide behind it until the source changes. I checked both on JDK 25.) The rule is simple: use `ofGreedy` only when the integrator's `false` can only ever come from `downstream.push(...)` returning `false`. If your integrator ever decides to stop on its own — a predicate, a count, a sentinel — use the plain integrator form. A Greedy integrator behind a downstream `limit` still stops correctly (verified: 3 consumed with `limit(3)`), because downstream rejection is handled by the framework; it is only *your own* short-circuit decision that gets ignored.
 
 ### Trap 2: capturing mutable state outside the initializer
 
